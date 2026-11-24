@@ -64,6 +64,12 @@ ROUTES: Final[dict[tuple[str, str], RouteAccess]] = {
     ("POST", "/api/browser/recipe-watch-off"): RouteAccess(
         "apps.browser_recipes.watch_off", UNSTABLE
     ),
+    # Owner dashboard only (handlers/browser_live_views.py); returns the slot's tab list.
+    ("POST", "/api/browser/live/views/tabs"): RouteAccess("browser.live.views.list", UNSTABLE),
+    # Owner dashboard only; starts a second live view of one of the slot's own tabs.
+    ("POST", "/api/browser/live/views/open"): RouteAccess("browser.live.views.open", UNSTABLE),
+    # Owner dashboard only; ends a second live view.
+    ("POST", "/api/browser/live/views/close"): RouteAccess("browser.live.views.close", UNSTABLE),
     # Owner gate (handlers/connections_app_manifest.py); writes nothing.
     ("GET", "/api/connections/app-manifests"): RouteAccess(
         "connections.app_manifests.read", UNSTABLE
