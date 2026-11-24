@@ -27,6 +27,7 @@ from kiro_crew.config.loader import (
     config_path,
     read_config_for_update,
 )
+from kiro_crew.http_proxy import SLACK_API_URL, resolve_proxy, slack_call_sync
 from kiro_crew.sel import sel
 
 logger = logging.getLogger(__name__)
@@ -528,10 +529,10 @@ def _validate_enterprise_unheld(
     extra = extra_ids or set()
 
     try:
-        from slack_sdk.web import WebClient
-
-        client = WebClient(token=bot_token)
-        resp = client.auth_test()
+        # Every caller runs this in a thread with no event loop (the gateway
+        # via asyncio.to_thread, kirocrew doctor synchronously), so the system
+        # proxy is resolved here; the gate seam keeps main's signature.
+        resp = slack_call_sync(bot_token, resolve_proxy(SLACK_API_URL), "auth_test")
     except Exception:
         # auth.test failed (missing slack_sdk or API error): the workspace
         # identity cannot be verified.  Whether we fail open or closed
