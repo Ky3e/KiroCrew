@@ -118,11 +118,14 @@ FORBIDDEN_BEFORE_THE_LIST = (
 #: the git grammar it reads a git argv with into the owner ``security.argv_floor_git_grammar``,
 #: which the facade imports with the rest of its owners; the module count rose by that one
 #: file and nothing new loads.
+#: Raised by 1 for ``mcp-mate`` (366 to 367): the memory-change card tools read their
+#: limits and kind names from ``kiro_crew.change_card_memory``, a ``typing``-only leaf;
+#: that one file is the whole rise.
 PACKAGE_MODULE_CEILING = {
     "mcp-core": 503,
     "mcp-cron": 370,
     "mcp-guide": 364,
-    "mcp-mate": 366,
+    "mcp-mate": 367,
 }
 
 #: The modules that read the two live values in the spawn tools' descriptions. They are
