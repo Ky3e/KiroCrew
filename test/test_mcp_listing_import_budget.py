@@ -118,11 +118,15 @@ FORBIDDEN_BEFORE_THE_LIST = (
 #: the git grammar it reads a git argv with into the owner ``security.argv_floor_git_grammar``,
 #: which the facade imports with the rest of its owners; the module count rose by that one
 #: file and nothing new loads.
+#: Raised by 1 for each server: the ``contributes.widgets`` block lives in its own
+#: stdlib-only ``kiro_crew.apps.manifest_widgets``, which ``manifest_contributes`` imports
+#: because the ``Contributes`` dataclass needs ``WidgetsConfig`` at import, as with
+#: ``manifest_memory_providers`` above; that one file is the whole rise.
 PACKAGE_MODULE_CEILING = {
-    "mcp-core": 503,
-    "mcp-cron": 370,
-    "mcp-guide": 364,
-    "mcp-mate": 366,
+    "mcp-core": 504,
+    "mcp-cron": 371,
+    "mcp-guide": 365,
+    "mcp-mate": 367,
 }
 
 #: The modules that read the two live values in the spawn tools' descriptions. They are
