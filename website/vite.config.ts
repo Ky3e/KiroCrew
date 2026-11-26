@@ -1176,6 +1176,15 @@ export default defineConfig({
               test: /[\\/]node_modules[\\/]dompurify[\\/]/,
             },
             {
+              // The memory graph's WebGL renderer (cosmos.gl, luma.gl and their
+              // own helpers) in one chunk of its own. Only the lazy Graph tab
+              // imports it; left to automatic chunking its modules re-cut the
+              // shared chunks of unrelated pages.
+              name: 'vendor-graph-gl',
+              priority: 21,
+              test: /[\\/]node_modules[\\/](@cosmos\.gl|@luma\.gl|@math\.gl|@probe\.gl|gl-bench|gl-matrix|random|seedrandom)[\\/]/,
+            },
+            {
               // Graph/network visualization stack (vis-network, vis-data, sigma,
               // graphology, cytoscape) — large and only used by graph views. Below
               // graph-physics so that group claims its two packages first.

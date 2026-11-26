@@ -34,6 +34,7 @@ from kiro_crew import member_memory_backup, platform_compat, portability
 from kiro_crew import snapshot as snap
 from kiro_crew import snapshot_redact as redact
 from kiro_crew.memory import INDEX_DB_FILE
+from kiro_crew.memory_graph_files import GRAPH_LAYOUT_FILE, building_name
 from kiro_crew.memory_stores import (
     EXECUTION_LOGS_DIR_NAME,
     MEMBER_API_KEY_FILE,
@@ -617,6 +618,25 @@ class TestRedactionKnowsAStoreDatabase:
         # The fixed paths still answer as before.
         assert redact._is_derived_index("memory_index.db")
         assert redact._is_product_database("memory.db")
+
+    def test_the_memory_graph_layout_is_dropped_for_a_rebuild_not_refused(self, tmp_path):
+        stage = tmp_path / "bundle"
+        (stage / ROOT / STORE).mkdir(parents=True)
+        (stage / "MANIFEST.json").write_text(json.dumps({"components": {}}), encoding="utf-8")
+        (stage / "notes.md").write_text("real memory\n", encoding="utf-8")
+        layouts = [
+            GRAPH_LAYOUT_FILE,
+            f"{ROOT}/{STORE}/{GRAPH_LAYOUT_FILE}",
+            f"{ROOT}/{STORE}/{building_name(4242)}",
+        ]
+        for rel in layouts:
+            # Binary SQLite pages: the text redactor cannot read them.
+            (stage / rel).write_bytes(b"SQLite format 3\x00" + bytes(range(256)) * 8)
+
+        report = redact.redact_bundle_for_egress(stage)
+
+        assert sorted(report.rebuilt_indexes) == sorted(layouts)
+        assert not any((stage / rel).exists() for rel in layouts)
 
 
 class TestTheDashboardExportCarriesNamedStores:

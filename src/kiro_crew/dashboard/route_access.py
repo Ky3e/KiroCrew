@@ -60,6 +60,14 @@ ROUTES: Final[dict[tuple[str, str], RouteAccess]] = {
     ("GET", "/api/apps/{name}/browser-sites"): RouteAccess("apps.browser_sites.read", UNSTABLE),
     # Owner dashboard only: 403 for an app token and an internal caller.
     ("POST", "/api/apps/{name}/browser-sites"): RouteAccess("apps.browser_sites.change", UNSTABLE),
+    # Memory owner gate (resolve_requested_memory_store in
+    # handlers/memory_graph_layout_api.py). Each first refreshes the store's layout
+    # file (StoreGraph.refresh: places new rows, and starts a background build when
+    # the file is missing or stale), then answers from it.
+    ("GET", "/api/memory/graph/overview"): RouteAccess("memory.graph.overview.refresh", UNSTABLE),
+    ("GET", "/api/memory/graph/nodes"): RouteAccess("memory.graph.nodes.refresh", UNSTABLE),
+    ("GET", "/api/memory/graph/search"): RouteAccess("memory.graph.search.refresh", UNSTABLE),
+    ("GET", "/api/memory/graph/select"): RouteAccess("memory.graph.select.refresh", UNSTABLE),
     # Owner gate (handlers/connections_app_manifest.py); writes nothing.
     ("GET", "/api/connections/app-manifests"): RouteAccess(
         "connections.app_manifests.read", UNSTABLE

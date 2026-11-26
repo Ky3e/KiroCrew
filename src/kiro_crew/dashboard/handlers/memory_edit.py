@@ -52,6 +52,8 @@ _RECORD_PARAMS = {
     "date_field",
     "mode",
     "weak",
+    "box",
+    "box_kinds",
     *memory_record_facets.FACET_GROUPS,
 }
 
@@ -91,6 +93,11 @@ async def api_memory_records(request: web.Request) -> web.Response:
         }
         if "ref" in request.query:
             filters["ref"] = request.query.getall("ref")
+        # A memory graph box selection: every record the graph places inside it.
+        if "box" in request.query:
+            filters["box"] = request.query["box"]
+        if "box_kinds" in request.query:
+            filters["box_kinds"] = request.query.getall("box_kinds")
         for bound in ("conf_min", "conf_max", "since", "until", "date_field"):
             if bound in request.query:
                 filters[bound] = request.query[bound]

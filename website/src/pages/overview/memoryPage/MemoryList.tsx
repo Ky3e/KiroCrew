@@ -178,7 +178,7 @@ export default function MemoryList({ jump, store, botName, privateMemory, canRec
   useEffect(() => {
     if (!jump) return
     setInput('')
-    setView(old => ({ ...old, q: '', kind: 'all', mode: 'words' as const, filters: { ref: jump.refs }, range: undefined }))
+    setView(old => ({ ...old, q: '', kind: 'all', mode: 'words' as const, filters: jump.box ? { box: jump.box.bbox, box_kinds: jump.box.kinds, box_count: jump.box.count } : { ref: jump.refs }, range: undefined }))
     const open = jump.open ? recordIdentity(jump.open) : null
     setDetailKey(open); setJumpFocus(open); focusScrolled.current = false
   }, [jump])
@@ -285,7 +285,7 @@ export default function MemoryList({ jump, store, botName, privateMemory, canRec
     </div></div>}
     {!selecting && <SavedTopics topics={topics.topics} query={view.q} canSave={meaning} onRun={runTopic} onRemove={topics.remove} onSave={() => topics.save(view.q)} />}
     <KindPills bot={botName} wrap={!phone} kind={view.kind} counts={facets?.kind} disabled={locked} onChange={(kind: KindTab) => change({ kind })} />
-    <ActiveFilters range={view.range} rangeField={dateField} onClearRange={() => setRange(undefined)} filters={filtersForKind(view.filters, view.kind)} onToggle={onToggleFilter} onRange={onRange} onClear={clearFilters} onClearRefs={() => { setJumpFocus(null); change({ filters: Object.fromEntries(Object.entries(view.filters).filter(([key]) => key !== 'ref')) }) }} />
+    <ActiveFilters range={view.range} rangeField={dateField} onClearRange={() => setRange(undefined)} filters={filtersForKind(view.filters, view.kind)} onToggle={onToggleFilter} onRange={onRange} onClear={clearFilters} onClearRefs={() => { setJumpFocus(null); change({ filters: Object.fromEntries(Object.entries(view.filters).filter(([key]) => !['ref', 'box', 'box_kinds', 'box_count'].includes(key))) }) }} />
   </div>
 
   const list = <div className="space-y-3">

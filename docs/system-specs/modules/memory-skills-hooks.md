@@ -1925,15 +1925,21 @@ always reachable. The rail and the record detail open and shut over 225 ms
 (width with the list reflowing beside it, the content clipped; the detail also
 slides and fades, and switching records only crossfades); reduced motion snaps.
 `ref` filters to exact records by ten hex digits of `sha256("kind:id")`
-(`memory_record_facets.record_ref`, at most 500), the Graph tab's hand-off: a
-fact or lesson node carries its `record`, a click on one opens that memory in the
-Memories tab, and a box drawn on empty canvas offers "N selected" and Show in
-Memories, which replaces the list's search, kind and filters with one removable
-chip. The Graph fills the content width and the window height below it (at least
-420 px) and re-fits on resize. On desktop it follows the Figma model: wheel or
-two-finger swipe pans, pinch or Ctrl/Cmd + wheel zooms at the pointer, drag on
-empty canvas selects, Space + drag or middle-drag pans; touch keeps sigma's own
-pan and pinch. Tags are filter toggles in rows and in the detail panel, which
+(`memory_record_facets.record_ref`, at most 500). `box` (`x0,y0,x1,y1` in layout
+units, `memory_record_facets.parse_box`) with optional `box_kinds` filters to the
+rows whose stored layout point lies in that box (`resolve_box`, read from the
+layout file with no cap), the Graph tab's hand-off: a fact or lesson node
+carries its `record`, a click on one opens that memory in the Memories tab, and
+a box drawn on empty canvas offers "N selected" (`/api/memory/graph/select`)
+and Show in Memories, which replaces the list's search, kind and filters with
+one removable chip. The Graph fills the content width and the window height
+below it (at least 420 px) and re-fits on resize. On desktop it follows the
+Figma model: wheel or two-finger swipe pans, pinch or Ctrl/Cmd + wheel zooms at
+the pointer, drag on empty canvas selects, Space + drag or middle-drag pans;
+touch pans with one finger and pinches with two (`memoryGraphGestures.ts`).
+The arrow keys move focus to the nearest node (or cluster) on screen in that
+direction, Enter opens the focused memory or zooms into the focused cluster, and
+Escape clears it; labels and the focus ring are DOM text over the canvas. Tags are filter toggles in rows and in the detail panel, which
 shows each score as its bare value, the grouped source label (raw source on
 hover), one Created time and plain-text revisions ("Edited · time", "Current").
 New memory saves a fact or a lesson, picked at the top of its form; the ⋯ menu
@@ -1949,10 +1955,48 @@ themes; each kind's icon has its own theme colour (fact `--info-text`, lesson
 `--accent`, experience `--ok-text`); Global memory's avatar is the `--tile-blue`
 tile; only Confidence below 0.5 is red.
 
-The page's Graph tab, after Memories, draws the selected store
-(`GET /api/memory/graph?store=`, the same owner-gated resolver as the profile
-documents; a bot's lessons come from its own vector tier, never the Global
-lessons file). It mounts on first visit only. Settings > Developer has no memory
+The page's Graph tab, after Memories, draws every fact, lesson and experience
+of the selected store from a layout the server builds and keeps
+(`memory_graph_layout.py`, `memory_graph_sidecar.py`, `memory_graph_service.py`;
+routes `/api/memory/graph/{overview,nodes,search,select}?store=`, the same
+owner-gated resolver as the profile documents; a bot's lessons come from its own
+vector tier, never the Global lessons file). The layout lives in
+`graph_layout.sqlite` beside the store's database: a background build projects
+the stored vectors to 64 dimensions (PCA), groups them with k-means, places the
+cluster centres with classical MDS and spreads each cluster's rows with that
+cluster's own 2-axis PCA; a row with no vector goes near the rows that share its
+tags or key namespace, and what is still unplaced goes in a band outside the
+layout. The file holds positions and the per-cluster maps, never memory text, so a
+redacted off-host backup drops it as a derived index (`memory_graph_files`,
+`snapshot_redact._is_derived_index`) and the next graph read rebuilds it. Each graph read first
+reconciles the file with the store (`StoreGraph.refresh`, keyed on the store
+file's stat and a 16-byte fingerprint of each row's vector): new rows are
+placed through their cluster's stored linear map, gone rows are removed, and
+when more rows were placed this way than 20% of the rows the last build laid
+out (`REBUILD_DRIFT`; a build of an empty store counts as one row), or the layout
+version or vector width changed, a full build runs in the background while the
+old file keeps serving. A memory write never touches the layout, so a graph
+failure cannot fail a write. Until the first build finishes every route answers
+`{"status": "building"}` and the tab says so. Each node carries
+`weight`, recall's weight for it (`episodic_search.recall_weight`, the same age
+decay recall ranks by), which sets its size and fade; a V2 store does not decay
+(`memory_decay.applies`), so its experiences carry weight 1 and none fades. Zoomed out the tab draws the clusters
+with their topic labels (the top words of their rows); it opens into nodes once
+the view holds about 20,000 rows or fewer (`NODE_BUDGET`, each cluster counted by
+the share of it in view), reads the nodes in each tile of the view box, following
+the cursor over pages of at most 2,000 (`PAGE_CAP`) up to that budget, and caches
+them by tile. A failed node, search or box read shows an error with Retry, never
+an empty result, and Refresh reads the overview, the nodes in view and the search
+again. Search runs on the server (up to 50,000 matches), the canvas dims what does not
+match and the camera fits the matches. The canvas is
+cosmos.gl (WebGL, loaded on first visit in its own bundle chunk); when the chunk
+fails to load or WebGL cannot start, an error inside the canvas says so and search
+and filters stay usable. Each kind pill carries a dot in the colour its nodes are
+drawn in, the graph's colour key. A node's label is redacted whole, then cut to
+120 characters (`LABEL_CHARS`). A node, search or box reply that comes back after
+the filter changed, or after Refresh, is dropped. Reduced motion
+turns off the cluster-to-node transition. It mounts on first visit only.
+Settings > Developer has no memory
 page any more; `/settings/developer/memory` opens `/settings/memory?focus=graph`.
 
 The embedded line under the header reads "X of Y embedded": X is every fact,
@@ -3899,7 +3943,11 @@ before reading transcript bodies, opening learned memory or billing a model.
 | PUT | `/api/memory/semantic` | Create/update (validates key, allowlist, injection; gated) |
 | DELETE | `/api/memory/semantic/{key}` | Tombstone + log event (gated). Optional JSON body for `kirocrew memory forget`: `expect_value_json` (compare-and-delete, 409 `value_changed`) and `superseded_by` (must be live and differ from the key: 409 `superseded_by_absent` / 400 `superseded_by_self`); other fields 400 `invalid_forget_body`. The dashboard sends no body |
 | GET | `/api/memory/events` | Recent audit trail |
-| GET | `/api/memory/graph` | Memory as nodes and edges for the graph view: preferences, projects, recent history, at most 200 semantic rows (first by key, lessons excluded, read on the key index) and the 200 newest lessons; `partial` (`{"semantic": bool, "lessons": bool}`) says which capped population left rows out |
+| GET | `/api/memory/graph` | Memory as nodes and edges for the graph view: preferences, projects, recent history, at most 200 semantic rows (first by key, lessons excluded, read on the key index) and the 200 newest lessons; `partial` (`{"semantic": bool, "lessons": bool}`) says which capped population left rows out | (no longer read by the dashboard)
+| GET | `/api/memory/graph/overview` | The store's laid-out clusters (centre, radius, count, topic label) and the layout's bounds and counts, or `{"status": "building"}` |
+| GET | `/api/memory/graph/nodes` | The nodes whose layout point lies in `bbox` (`x0,y0,x1,y1`), optional repeated `kind`, paged by `cursor` with `limit` up to 2,000; each carries `ref`, `record` and `weight` (recall's weight, `episodic_search.recall_weight`) |
+| GET | `/api/memory/graph/search` | Laid-out points matching `q` by words, or by meaning with `mode=meaning`; optional `kind`; at most 50,000 matches plus the `total` |
+| GET | `/api/memory/graph/select` | How many nodes lie in `bbox` for the optional `kind`s, the count behind "N selected" |
 | GET/PUT | `/api/memory/settings` | Consolidation settings; see the memory settings card above |
 | GET | `/api/memory/carve` | Filter or count one crew store by carve facet. Query: the five facet names, `kind`, `count_by`, `limit`, `offset`, plus the shared `?store=`. Absent, it reads the global store; present, it is owner-gated like every other store-scoped route. 409 `facets_unsupported` on the v1 lineage, 400 `unknown_facet`, 400 `invalid_pagination`, 503 `store_unavailable`. Every answer echoes the `store` it read. See [Who reads a facet](#who-reads-a-facet) |
 | GET | `/api/memory/episodic` | Paginated episodic list |
