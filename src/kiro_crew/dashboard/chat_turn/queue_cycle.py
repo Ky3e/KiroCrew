@@ -963,9 +963,10 @@ async def _end_unstarted_cycle(state: DashboardState, slot: _ChatSlot) -> None:
         )
 
 
-#: Meta key on the error row of a turn that raised before its main ``try``. The
-#: cycle still ends with a ``done`` row, so an HTTP reader that waits for
-#: ``done`` reads this key to report the failure instead of an empty reply.
+#: Meta key on the error row of a turn that raised before its main ``try``, or
+#: that the idle sweep found stalled before it started. An HTTP reader that
+#: waits for the cycle's ``done`` row reads this key to report the failure
+#: instead of an empty reply.
 TURN_FAILED_META = "turn_failed"
 
 
@@ -989,15 +990,25 @@ def _note_failed_before_the_try(slot: _ChatSlot, turn_exit: _TurnExit) -> None:
             },
         )
     else:
-        slot.append(
-            "error",
-            "⚠️ This message failed before it started. The gateway log has the details.",
-            "msg msg-err",
-            meta={
-                TURN_FAILED_META: True,
-                **gn.gateway_notice_meta(gn.GATEWAY_NOTICE_TURN_FAILED_BEFORE_START),
-            },
-        )
+        note_message_failed_before_start(slot)
+
+
+def note_message_failed_before_start(slot: _ChatSlot) -> None:
+    """Append the error row of a message whose turn never started.
+
+    Also posted when the idle sweep resets a session whose newest message has
+    waited over a minute for its turn to take it (``session_events._on_idle_expired``)."""
+    from kiro_crew.dashboard import gateway_notice as gn
+
+    slot.append(
+        "error",
+        "⚠️ This message failed before it started. The gateway log has the details.",
+        "msg msg-err",
+        meta={
+            TURN_FAILED_META: True,
+            **gn.gateway_notice_meta(gn.GATEWAY_NOTICE_TURN_FAILED_BEFORE_START),
+        },
+    )
 
 
 async def _turn_record_outcome(turn: _ChatTurn) -> None:
