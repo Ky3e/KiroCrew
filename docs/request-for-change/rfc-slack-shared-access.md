@@ -87,7 +87,8 @@ owner's:
 | The switch and the list (dashboard, loopback, never an app token or internal caller) | Only the owner grants access |
 | YOLO, approval-mode changes; answering (Trust included) another person's prompt, except Approve / Reject in a code channel the shared user opened (below) | Each widens what runs without the owner. Trust on a prompt their own turn posted is the shared user's (amended 2026-11-25, at the owner's request): it widens only the session they are already driving, the same per-session grant the owner's click makes |
 | `!dashboard` and other dashboard links | A link is full dashboard access |
-| Every other `!` command (`!channel`, `!agent`, `!ta`, ...), `/kirocrew` | Channel activation, agent overrides and settings |
+| `!trust` for anyone's turns but the sender's own | The owner's `!trust` puts the whole thread's session on Trust. A shared user's `!trust` (amended 2026-11-26, at the owner's request) covers only the turns that person sends in that thread, on the session that is running when they type it: not the owner's turns, not another shared user's, not sub-agents, and no approval-policy write. The owner's `!trust off` ends it |
+| Every other `!` command (`!channel`, `!agent`, `!ta`, ...; not `!trust`, above), `/kirocrew` | Channel activation, agent overrides and settings |
 | A message starting with `/`; `!temporary` / `!incognito` | The agent harness's own commands (`/agent`, `/model`, `/tools trust-all`) and keeping a turn out of the owner's record |
 | The Home tab, the `sessions` list, and the `spawn list` and `status` keywords | They list every session or subagent, or count the host's |
 | `run` and natural-language cron keywords | Scheduling and task runs |
