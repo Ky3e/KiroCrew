@@ -249,3 +249,60 @@ class TestTheLineCarriesNoSecretAndIsThrottled:
         await _get(_headers(ATTESTED_KEY))
         lines = _would_refuse_lines(caplog)
         assert len(lines) == 2 and "4 such requests" in lines[1]
+
+
+def _enforce(monkeypatch) -> None:
+    monkeypatch.setattr(token_auth, "unattested_session_key_mode", lambda: "enforce")
+
+
+class TestEnforceMode:
+    """``dashboard.unattested_session_keys = enforce`` refuses what log mode records."""
+
+    @pytest.mark.asyncio
+    async def test_log_mode_still_admits_the_unattested_key(self, monkeypatch, caplog) -> None:
+        # Default mode: the request is answered exactly as before, plus the log line.
+        monkeypatch.setattr(token_auth, "unattested_session_key_mode", lambda: "log")
+        caplog.set_level(logging.WARNING, logger=LOGGER)
+        status, body = await _get(_headers(ATTESTED_KEY))
+        assert status == 200 and body["internal_auth"] is True
+        assert len(_would_refuse_lines(caplog)) == 1
+
+    @pytest.mark.asyncio
+    async def test_enforce_refuses_an_unattested_tcp_key(self, monkeypatch, caplog) -> None:
+        _enforce(monkeypatch)
+        caplog.set_level(logging.WARNING, logger=LOGGER)
+        status, _body = await _get(_headers(ATTESTED_KEY))
+        assert status == 403
+        # The would-refuse line still fires, so the log and the refusal name one set.
+        assert len(_would_refuse_lines(caplog)) == 1
+
+    @pytest.mark.asyncio
+    async def test_enforce_admits_an_attested_key(self, monkeypatch) -> None:
+        _enforce(monkeypatch)
+        status, body = await _get(_headers(ATTESTED_KEY, token=GOOD_TOKEN))
+        assert status == 200 and body["app"] == "file-explorer"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("key", [None, "dashboard:ui"])
+    async def test_enforce_never_touches_an_exempt_key(self, monkeypatch, key) -> None:
+        _enforce(monkeypatch)
+        status, _body = await _get(_headers(key))
+        assert status == 200
+
+    def test_the_config_default_is_log(self) -> None:
+        from kiro_crew.config.sections_dashboard import DashboardConfig
+
+        assert DashboardConfig().unattested_session_keys == "log"
+
+    def test_the_mode_reads_the_live_value(self, monkeypatch) -> None:
+        from kiro_crew.config import live
+
+        cfg = SimpleNamespace(dashboard=SimpleNamespace(unattested_session_keys="enforce"))
+        monkeypatch.setattr(live, "snapshot", lambda: cfg)
+        assert token_auth_callers.unattested_session_key_mode() == "enforce"
+        monkeypatch.setattr(
+            live,
+            "snapshot",
+            lambda: SimpleNamespace(dashboard=SimpleNamespace(unattested_session_keys="bogus")),
+        )
+        assert token_auth_callers.unattested_session_key_mode() == "log"
