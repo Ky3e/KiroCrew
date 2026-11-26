@@ -20,7 +20,7 @@ import unicodedata
 from datetime import datetime, timezone
 from typing import Any
 
-from kiro_crew import memory_record_facets, memory_record_meaning, memory_schema
+from kiro_crew import memory_decay, memory_record_facets, memory_record_meaning, memory_schema
 
 MAX_BATCH_ROWS = 10000
 MAX_BATCH_BYTES = 32 * 1024 * 1024
@@ -240,6 +240,9 @@ def _rows(
         return f" AND {column} IN ({','.join('?' for _ in values)})" if values else " AND 0"
 
     tokens = _normalized(query["q"]).split()
+    # One clock for the pass, so every row's strength is read on the same day.
+    now = datetime.now(timezone.utc)
+    decays = memory_decay.applies(store)
     sql = (
         "SELECT CASE WHEN key LIKE 'lesson.%' THEN 'directive' ELSE 'fact' END AS kind, "
         "key AS id, key, value_json, value_json AS text, source, created_at, updated_at, '' AS tags, "
@@ -294,7 +297,7 @@ def _rows(
                 if tokens and not all(token in folded for token in tokens):
                     continue
             if summaries or filters:
-                summary = _summary(store, row, tokens, folded)
+                summary = _summary(store, row, tokens, folded, now if decays else None)
                 if summaries:
                     yield summary
                     continue
@@ -328,14 +331,28 @@ def _rows(
                 record["updated_at"] = meta.get("updated_at", record["updated_at"])
             record["metadata"] = meta
             record["email_addresses"] = meta.get("email_addresses", [])
-            yield _record(record)
+            assembled = _record(record)
+            # After the revision hash: strength moves with the day, the record does not.
+            if decays and row["kind"] == "episode":
+                assembled["decay"] = memory_decay.record_decay(store, row, now)
+            yield assembled
     finally:
         cursor.close()
 
 
-def _summary(store: Any, row: Any, tokens: list[str], folded: str) -> dict:
-    """The light form of one row that the record list sorts, filters and counts."""
+def _summary(
+    store: Any, row: Any, tokens: list[str], folded: str, now: datetime | None = None
+) -> dict:
+    """The light form of one row that the record list sorts, filters and counts.
+
+    With *now*, a V1 store's experience also carries its strength on that day.
+    """
     kind = row["kind"]
+    strength, band = (
+        memory_decay.summary_strength(store, row, now)
+        if now is not None and kind == "episode"
+        else (None, None)
+    )
     # The same source the assembled record reports: the item's on the crew lineage,
     # else the row's own, else the metadata's source reference.
     if "_source" in row.keys():
@@ -358,6 +375,7 @@ def _summary(store: Any, row: Any, tokens: list[str], folded: str) -> dict:
         "updated_at": updated or "",
         "confidence": score if kind != "episode" and score is not None else None,
         "importance": score if kind == "episode" and score is not None else None,
+        "strength": strength,
         "match": memory_record_facets.match_score(tokens, _normalized(row["key"] or ""), folded),
         "ref": memory_record_facets.record_ref(kind, row["id"]),
         "facets": memory_record_facets.summary_facets(
@@ -368,6 +386,7 @@ def _summary(store: Any, row: Any, tokens: list[str], folded: str) -> dict:
             # Where a row came from: stamped on the crew lineage only.
             surface=row["_surface"] if "_surface" in row.keys() else None,
             crew=row["_crew"] if "_crew" in row.keys() else None,
+            strength=band,
         ),
     }
 
@@ -437,6 +456,8 @@ def _cached_summaries(store: Any, base: dict) -> list[dict]:
         except OSError:
             files.append(None)
     fingerprint = (
+        # Strength moves with the day, so a new day is a miss too.
+        datetime.now(timezone.utc).date(),
         store.db.total_changes,
         store.db.execute("PRAGMA data_version").fetchone()[0],
         *files,
@@ -486,7 +507,9 @@ def list_records(
     if isinstance(limit, bool) or isinstance(offset, bool) or not 1 <= limit <= 100 or offset < 0:
         raise MemoryEditError("Use a page size of 1–100 and a non-negative offset.")
     if sort is not None and sort not in memory_record_facets.SORTS:
-        raise MemoryEditError("Sort by updated, created, confidence, importance, key or match.")
+        raise MemoryEditError(
+            "Sort by updated, created, confidence, importance, strength, key or match."
+        )
     if (sort == "match" or meaning) and not query["q"]:
         raise MemoryEditError("Best match needs search words.")
     vector = None
@@ -573,6 +596,8 @@ def list_records(
     }
     if meaning:
         body["hidden"] = hidden
+    if facets and memory_decay.applies(store):
+        body["decay"] = memory_decay.store_decay(store)
     if facets:
         # A meaning search ranks a fresh copy each time: nothing to reuse.
         body["facets"] = (

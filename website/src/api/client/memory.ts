@@ -9,7 +9,7 @@
  */
 
 import type { MemoryCarveEntry, MemoryStoreSummary, RetiredMemory, MemoryBackup } from '../../types'
-import type { MemoryRecordQuery, MemoryRecord, MemoryRecordSelection, MemoryEditOperation, MemoryEditPreview, MemoryRecordRef, MemoryRecordRevision, MemoryRecordFacets, MemoryRecordSort } from '../../types/memoryEditing'
+import type { MemoryRecordQuery, MemoryRecord, MemoryRecordSelection, MemoryEditOperation, MemoryEditPreview, MemoryRecordRef, MemoryRecordRevision, MemoryRecordFacets, MemoryRecordSort, MemoryStoreDecay } from '../../types/memoryEditing'
 import type { ClientTransport } from './transport'
 
 /** How the memory page orders a record list and whether it asks for facet counts. */
@@ -204,7 +204,7 @@ export function createMemoryEndpoints({ get, post, put, del, j, jfetch: fetch }:
     memoryRecall: (query: string, store: string) =>
       fetch('/api/memory/recall?q=' + encodeURIComponent(query) + memoryStoreQuery(store, '&')).then(j),
     memoryRecords: (store: string, query: MemoryRecordQuery, offset = 0, limit = 50, view: MemoryRecordView = {}) =>
-      fetch('/api/memory/records?' + memoryRecordParams(store, query, offset, limit, view)).then(j) as Promise<{ entries: MemoryRecord[]; total: number; has_more: boolean; facets?: MemoryRecordFacets; hidden?: number }>,
+      fetch('/api/memory/records?' + memoryRecordParams(store, query, offset, limit, view)).then(j) as Promise<{ entries: MemoryRecord[]; total: number; has_more: boolean; facets?: MemoryRecordFacets; hidden?: number; decay?: MemoryStoreDecay }>,
     memoryEditPreview: (store: string, selection: MemoryRecordSelection, operation: MemoryEditOperation) =>
       post('/api/memory/bulk/preview', { store: store || 'default', selection, operation }).then(j) as Promise<MemoryEditPreview>,
     memoryEditPreviewPage: (store: string, previewId: string, offset: number) =>
