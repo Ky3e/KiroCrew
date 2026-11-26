@@ -25418,11 +25418,12 @@
     "strength_keep": "Richiami e modifiche non rallentano lo svanire. Le lezioni non svaniscono mai.",
     "save_as_lesson": "Salva come lezione",
     "strength_curve_label": "Forza {{now}} oggi, {{start}} al salvataggio.",
-    "strength_chart_caption": "Giorno in cui ogni tasso fa svanire un ricordo di importanza {{importance}}",
     "strength_default_rate": "Tasso predefinito",
-    "strength_day": "Giorno {{day}}",
-    "strength_never_short": "Mai",
-    "divider_no_strength": "Fatti e lezioni non svaniscono · prima i più recenti"
+    "divider_no_strength": "Fatti e lezioni non svaniscono · prima i più recenti",
+    "strength_rate_outrank_one": "{{label}}: i ricordi nuovi superano uno di importanza {{importance}} dopo {{days}} giorno",
+    "strength_rate_outrank_many": "{{label}}: i ricordi nuovi superano uno di importanza {{importance}} dopo {{days}} giorni",
+    "strength_rate_outrank_other": "{{label}}: i ricordi nuovi superano uno di importanza {{importance}} dopo {{days}} giorni",
+    "strength_rate_steady": "{{label}}: non svanisce"
   },
   "uiLocations": {
     "description": {

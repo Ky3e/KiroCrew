@@ -77,9 +77,9 @@ describe('strength on the memory list', () => {
     const group = within(rail).getByRole('region', { name: 'Strength · experiences' })
     expect(within(group).getAllByRole('checkbox').map(box => box.getAttribute('aria-label'))).toEqual(['Strong', 'Faded'])
     const chart = within(group).getByTestId('store-fade-chart')
-    expect(within(chart).getByText('Day 27')).toBeVisible()
-    expect(within(chart).getByText('#keep')).toBeVisible()
-    expect(within(chart).getByText('Never')).toBeVisible()
+    // The day comes from the live rate: 0.03 a day puts importance 0.5 under the line on day 27.
+    expect(within(chart).getByText('Default rate: new memories outrank one at importance 0.5 after 27 days')).toBeVisible()
+    expect(within(chart).getByText("#keep: doesn't fade")).toBeVisible()
     fireEvent.click(within(group).getByRole('checkbox', { name: 'Faded' }))
     await waitFor(() => expect(lastView()[1]).toEqual({ q: '', kind: 'all', filters: { strength: ['faded'] } }))
   })
@@ -108,6 +108,13 @@ describe('strength on the memory list', () => {
     expect(within(detail).queryByRole('button', { name: 'Save as lesson' })).toBeNull()
   })
 
+  it('counts the rail sentence’s day from the store’s own rate', async () => {
+    api.memoryRecords.mockResolvedValue({ entries: [FADED], total: 1, has_more: false, facets: FACETS, decay: { ...STORE_DECAY, rates: [{ tag: null, rate: 0.06 }] } })
+    renderWithProviders(<List />)
+    // ln(0.85 / 0.385) / 0.06 = 13.2, so the first whole day under the line is 14.
+    expect(await screen.findByText('Default rate: new memories outrank one at importance 0.5 after 14 days')).toBeInTheDocument()
+  })
+
   it('opens a row whose crossing is past any date JavaScript holds', async () => {
     const slow = { ...FADED, decay: { ...FADED.decay, strength: 0.85, rate: 1e-9, days_to_line: 791_993_016, state: 'strong' } }
     api.memoryRecords.mockResolvedValue({ entries: [slow], total: 1, has_more: false, facets: FACETS, decay: { ...STORE_DECAY, rates: [{ tag: null, rate: 1e-9 }] } })
@@ -116,7 +123,7 @@ describe('strength on the memory list', () => {
     fireEvent.click(within(rows).getByRole('button', { name: 'View details' }))
     const detail = await screen.findByTestId('strength-detail')
     expect(within(detail).queryByText(/new memories rank above it/)).toBeNull()
-    expect(within(screen.getByTestId('store-fade-chart')).getByText('Never')).toBeInTheDocument()
+    expect(within(screen.getByTestId('store-fade-chart')).getByText("Default rate: doesn't fade")).toBeInTheDocument()
   })
 
   it('offers the Strength sort only on a store that fades', async () => {

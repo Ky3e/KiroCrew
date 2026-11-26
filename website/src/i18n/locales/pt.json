@@ -25418,11 +25418,12 @@
     "strength_keep": "Recuperações e edições não atrasam o enfraquecimento. Lições nunca enfraquecem.",
     "save_as_lesson": "Salvar como lição",
     "strength_curve_label": "Força {{now}} hoje, {{start}} ao salvar.",
-    "strength_chart_caption": "Dia em que cada taxa enfraquece uma memória de importância {{importance}}",
     "strength_default_rate": "Taxa padrão",
-    "strength_day": "Dia {{day}}",
-    "strength_never_short": "Nunca",
-    "divider_no_strength": "Fatos e lições não enfraquecem · mais recentes primeiro"
+    "divider_no_strength": "Fatos e lições não enfraquecem · mais recentes primeiro",
+    "strength_rate_outrank_one": "{{label}}: memórias novas passam à frente de uma de importância {{importance}} após {{days}} dia",
+    "strength_rate_outrank_many": "{{label}}: memórias novas passam à frente de uma de importância {{importance}} após {{days}} dias",
+    "strength_rate_outrank_other": "{{label}}: memórias novas passam à frente de uma de importância {{importance}} após {{days}} dias",
+    "strength_rate_steady": "{{label}}: não enfraquece"
   },
   "uiLocations": {
     "description": {

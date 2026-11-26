@@ -24212,11 +24212,10 @@
     "strength_keep": "召回和编辑不会减慢衰减。经验永不衰减。",
     "save_as_lesson": "存为经验",
     "strength_curve_label": "今天强度 {{now}}，保存时 {{start}}。",
-    "strength_chart_caption": "重要度 {{importance}} 的记忆在各速率下淡出的天数",
     "strength_default_rate": "默认速率",
-    "strength_day": "第 {{day}} 天",
-    "strength_never_short": "永不",
-    "divider_no_strength": "事实和经验不会衰减 · 最新在前"
+    "divider_no_strength": "事实和经验不会衰减 · 最新在前",
+    "strength_rate_outrank_other": "{{label}}：重要度 {{importance}} 的记忆会在 {{days}} 天后排在新记忆后面",
+    "strength_rate_steady": "{{label}}：不会衰减"
   },
   "uiLocations": {
     "description": {

@@ -24815,11 +24815,11 @@
     "strength_keep": "याद करने या बदलने से घटना धीमा नहीं होता। सीख कभी नहीं घटती।",
     "save_as_lesson": "सीख के रूप में सहेजो",
     "strength_curve_label": "आज शक्ति {{now}}, सहेजते समय {{start}}।",
-    "strength_chart_caption": "हर दर पर {{importance}} महत्व वाली स्मृति जिस दिन कमज़ोर होती है",
     "strength_default_rate": "डिफ़ॉल्ट दर",
-    "strength_day": "दिन {{day}}",
-    "strength_never_short": "कभी नहीं",
-    "divider_no_strength": "तथ्य और सीख नहीं घटते · नए पहले"
+    "divider_no_strength": "तथ्य और सीख नहीं घटते · नए पहले",
+    "strength_rate_outrank_one": "{{label}}: {{days}} दिन बाद नई स्मृतियाँ {{importance}} महत्व वाली स्मृति से ऊपर आती हैं",
+    "strength_rate_outrank_other": "{{label}}: {{days}} दिन बाद नई स्मृतियाँ {{importance}} महत्व वाली स्मृति से ऊपर आती हैं",
+    "strength_rate_steady": "{{label}}: नहीं घटती"
   },
   "uiLocations": {
     "description": {

@@ -116,22 +116,22 @@ export function StoreFadeChart({ decay }: { decay: MemoryStoreDecay }) {
   const { t } = useTranslation()
   const days = decay.rates.map(rate => withinReach(dayUnderLine(TYPICAL_START, rate.rate, decay.fade_line)))
   const span = Math.max(30, ...days.map(day => (day ?? 0) * 1.2))
-  const caption = t('memoryPage.strength_chart_caption', { importance: fmtNumber(0.5) })
+  // One sentence per rate, the day counted from the live rate.
+  const lines = decay.rates.map((rate, index) => {
+    const label = rate.tag === null ? t('memoryPage.strength_default_rate') : `#${rate.tag}`
+    const day = days[index]
+    return day === null ? t('memoryPage.strength_rate_steady', { label })
+      : t('memoryPage.strength_rate_outrank', { label, count: day, days: fmtNumber(day), importance: fmtNumber(0.5) })
+  })
   // A panel of its own, so the rates read as a picture and not as more filter rows.
   return <div className="mb-2 space-y-1.5 rounded-lg bg-bg-hover p-2.5" data-testid="store-fade-chart">
     <svg
       role="img" className="block h-16 w-full" preserveAspectRatio="none"
       viewBox={`0 0 ${W} ${H}`}
-      aria-label={caption}>
+      aria-label={lines.join(' ')}>
       {/* The default rate is the lit curve; tag rates step down. */}
       {decay.rates.map((rate, index) => <Curve key={rate.tag ?? ''} start={TYPICAL_START} rate={rate.rate} span={span} line={decay.fade_line} lit={index === 0} />).reverse()}
     </svg>
-    <p className="m-0 text-[11px] leading-4 text-muted">{caption}</p>
-    <dl className="m-0 grid gap-x-2 gap-y-0.5 text-[12px] leading-5" style={{ gridTemplateColumns: 'minmax(0,1fr) auto' }}>
-      {decay.rates.map((rate, index) => [
-        <dt key={`${rate.tag}:k`} className={`truncate ${index === 0 ? 'text-text' : 'text-muted'}`}>{rate.tag === null ? t('memoryPage.strength_default_rate') : `#${rate.tag}`}</dt>,
-        <dd key={`${rate.tag}:v`} className="m-0 text-right tabular-nums text-muted">{days[index] === null ? t('memoryPage.strength_never_short') : t('memoryPage.strength_day', { day: fmtNumber(days[index]!) })}</dd>,
-      ])}
-    </dl>
+    {lines.map((line, index) => <p key={decay.rates[index].tag ?? ''} className={`m-0 text-[12px] leading-5 ${index === 0 ? 'text-text' : 'text-muted'}`}>{line}</p>)}
   </div>
 }

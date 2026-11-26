@@ -24815,11 +24815,11 @@
     "strength_keep": "Abrufe und Bearbeitungen bremsen das Verblassen nicht. Lektionen verblassen nie.",
     "save_as_lesson": "Als Lektion speichern",
     "strength_curve_label": "Stärke heute {{now}}, beim Speichern {{start}}.",
-    "strength_chart_caption": "Tag, an dem jede Rate eine Erinnerung mit Wichtigkeit {{importance}} verblassen lässt",
     "strength_default_rate": "Standardrate",
-    "strength_day": "Tag {{day}}",
-    "strength_never_short": "Nie",
-    "divider_no_strength": "Fakten und Lektionen verblassen nicht · neueste zuerst"
+    "divider_no_strength": "Fakten und Lektionen verblassen nicht · neueste zuerst",
+    "strength_rate_outrank_one": "{{label}}: Neue Erinnerungen überholen eine mit Wichtigkeit {{importance}} nach {{days}} Tag",
+    "strength_rate_outrank_other": "{{label}}: Neue Erinnerungen überholen eine mit Wichtigkeit {{importance}} nach {{days}} Tagen",
+    "strength_rate_steady": "{{label}}: verblasst nicht"
   },
   "uiLocations": {
     "description": {

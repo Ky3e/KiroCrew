@@ -24212,11 +24212,10 @@
     "strength_keep": "회상이나 편집으로는 감소가 늦춰지지 않아요. 학습 내용은 감소하지 않아요.",
     "save_as_lesson": "학습 내용으로 저장",
     "strength_curve_label": "오늘 강도 {{now}}, 저장할 때 {{start}}",
-    "strength_chart_caption": "중요도 {{importance}}인 기억이 비율별로 약해지는 날",
     "strength_default_rate": "기본 비율",
-    "strength_day": "{{day}}일째",
-    "strength_never_short": "없음",
-    "divider_no_strength": "사실과 학습 내용은 감소하지 않음 · 최신순"
+    "divider_no_strength": "사실과 학습 내용은 감소하지 않음 · 최신순",
+    "strength_rate_outrank_other": "{{label}}: 중요도 {{importance}}인 기억은 {{days}}일 후 새 기억보다 아래에 표시돼요",
+    "strength_rate_steady": "{{label}}: 감소하지 않음"
   },
   "uiLocations": {
     "description": {

@@ -24815,11 +24815,11 @@
     "strength_keep": "মনে করা বা সম্পাদনায় কমা ধীর হয় না। শিক্ষা কখনো কমে না।",
     "save_as_lesson": "শিক্ষা হিসেবে সংরক্ষণ করো",
     "strength_curve_label": "আজ শক্তি {{now}}, সংরক্ষণের সময় {{start}}।",
-    "strength_chart_caption": "প্রতিটি হারে {{importance}} গুরুত্বের স্মৃতি যেদিন দুর্বল হয়",
     "strength_default_rate": "ডিফল্ট হার",
-    "strength_day": "দিন {{day}}",
-    "strength_never_short": "কখনো না",
-    "divider_no_strength": "তথ্য ও শিক্ষা কমে না · নতুনগুলো আগে"
+    "divider_no_strength": "তথ্য ও শিক্ষা কমে না · নতুনগুলো আগে",
+    "strength_rate_outrank_one": "{{label}}: {{days}} দিন পরে নতুন স্মৃতি {{importance}} গুরুত্বের স্মৃতির উপরে আসে",
+    "strength_rate_outrank_other": "{{label}}: {{days}} দিন পরে নতুন স্মৃতি {{importance}} গুরুত্বের স্মৃতির উপরে আসে",
+    "strength_rate_steady": "{{label}}: কমে না"
   },
   "uiLocations": {
     "description": {

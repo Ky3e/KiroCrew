@@ -25418,11 +25418,12 @@
     "strength_keep": "Las recuperaciones y las ediciones no frenan el desvanecimiento. Las lecciones nunca se desvanecen.",
     "save_as_lesson": "Guardar como lección",
     "strength_curve_label": "Fuerza {{now}} hoy, {{start}} al guardarlo.",
-    "strength_chart_caption": "Día en que cada ritmo desvanece un recuerdo de importancia {{importance}}",
     "strength_default_rate": "Ritmo predeterminado",
-    "strength_day": "Día {{day}}",
-    "strength_never_short": "Nunca",
-    "divider_no_strength": "Los hechos y las lecciones no se desvanecen · más recientes primero"
+    "divider_no_strength": "Los hechos y las lecciones no se desvanecen · más recientes primero",
+    "strength_rate_outrank_one": "{{label}}: los recuerdos nuevos superan a uno de importancia {{importance}} después de {{days}} día",
+    "strength_rate_outrank_many": "{{label}}: los recuerdos nuevos superan a uno de importancia {{importance}} después de {{days}} días",
+    "strength_rate_outrank_other": "{{label}}: los recuerdos nuevos superan a uno de importancia {{importance}} después de {{days}} días",
+    "strength_rate_steady": "{{label}}: no se desvanece"
   },
   "uiLocations": {
     "description": {

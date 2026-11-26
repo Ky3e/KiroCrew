@@ -26021,11 +26021,13 @@
     "strength_keep": "Вызовы и правки не замедляют ослабление. Уроки не слабеют никогда.",
     "save_as_lesson": "Сохранить как урок",
     "strength_curve_label": "Сила сегодня {{now}}, при сохранении {{start}}.",
-    "strength_chart_caption": "День, когда каждая скорость ослабляет воспоминание важностью {{importance}}",
     "strength_default_rate": "Скорость по умолчанию",
-    "strength_day": "День {{day}}",
-    "strength_never_short": "Никогда",
-    "divider_no_strength": "Факты и уроки не слабеют · сначала новые"
+    "divider_no_strength": "Факты и уроки не слабеют · сначала новые",
+    "strength_rate_outrank_one": "{{label}}: новые воспоминания обходят воспоминание важностью {{importance}} через {{days}} день",
+    "strength_rate_outrank_few": "{{label}}: новые воспоминания обходят воспоминание важностью {{importance}} через {{days}} дня",
+    "strength_rate_outrank_many": "{{label}}: новые воспоминания обходят воспоминание важностью {{importance}} через {{days}} дней",
+    "strength_rate_outrank_other": "{{label}}: новые воспоминания обходят воспоминание важностью {{importance}} через {{days}} дня",
+    "strength_rate_steady": "{{label}}: не слабеет"
   },
   "uiLocations": {
     "description": {
