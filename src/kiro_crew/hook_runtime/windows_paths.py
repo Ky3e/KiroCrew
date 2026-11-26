@@ -46,6 +46,18 @@ def is_unc_shape(raw: str) -> bool:
     return len(raw) >= 2 and raw[0] in "\\/" and raw[1] in "\\/"
 
 
+def unc_root_refused(raw: str) -> bool:
+    """Whether a project root names a network share this host must not resolve.
+
+    Windows only: there any two leading separators (``\\\\h\\s``, ``//h/s``,
+    ``/\\h\\s``) name a host, and resolving the text opens a connection to it.
+    On POSIX a doubled leading slash is an ordinary local path. A share under a
+    root this gateway writes to stays allowed (:func:`unc_probe_allowed`).
+    Purely lexical, so a caller runs it before any filesystem call.
+    """
+    return os.name == "nt" and is_unc_shape(raw) and not unc_probe_allowed(raw)
+
+
 def _fold_extended_length_local(raw: str) -> str:
     r"""Fold a ``\\?\<drive>:\...`` extended-length LOCAL path to plain ``<drive>:\...``.
 

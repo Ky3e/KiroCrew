@@ -151,6 +151,50 @@ class TestChatSlotProject:
             assert resp.status == 400
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "project, os_name, refused",
+        [
+            ("//server/share/proj", "nt", True),
+            ("/\\server\\share\\proj", "nt", True),
+            ("\\\\server\\share\\proj", "nt", True),
+            ("C:\\Work\\proj", "nt", False),
+            ("C:/Work/proj", "nt", False),
+            ("~/proj", "nt", False),
+            # POSIX reads a doubled leading slash as a local path.
+            ("//tmp/proj", "posix", False),
+        ],
+    )
+    async def test_share_root_refused_before_any_resolve(
+        self, project, os_name, refused, monkeypatch
+    ):
+        """On Windows a share spelling is refused before anything resolves it;
+        a local root still reaches the resolver."""
+        touched: list[str] = []
+
+        def _record(p, *a, **k):
+            touched.append(str(p))
+            return "/nonexistent_xyz_123"
+
+        slot = _ChatSlot("test")
+        state = _mock_state(slot)
+        async with TestClient(TestServer(_make_app(state))) as client:
+            with monkeypatch.context() as mp:
+                mp.setattr(os.path, "realpath", _record)
+                mp.setattr(os, "name", os_name)
+                resp = await client.post("/api/chat/slots/test/project", json={"project": project})
+            data = await resp.json()
+        assert resp.status == 400
+        if refused:
+            assert data["error"] == "Project must be a local directory, not a network share"
+            assert data["code"] == "unc_path_refused"
+            # Only share resolves count: the fixture's own home may resolve too.
+            assert [p for p in touched if "server" in p] == []
+        else:
+            assert data["error"] == "Not a directory"
+            assert os.path.expanduser(project) in touched
+        assert slot.project == ""
+
+    @pytest.mark.asyncio
     async def test_sensitive_path_returns_403(self):
         # The crew home is a per-test tmp dir here; ``diag`` is on its fence.
         fenced = os.path.join(os.environ["KIROCREW_HOME"], "diag")

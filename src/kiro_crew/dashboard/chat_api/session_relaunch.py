@@ -731,6 +731,18 @@ async def api_chat_slot_project(request: web.Request) -> web.Response:
             return web.json_response(
                 {"error": "Not a directory", "code": "not_a_directory"}, status=400
             )
+        from kiro_crew.hooks import unc_root_refused
+
+        # Lexical, before probe() resolves it: on Windows, resolving a share
+        # spelling contacts the named host.
+        if unc_root_refused(os.path.expanduser(project)):
+            return web.json_response(
+                {
+                    "error": "Project must be a local directory, not a network share",
+                    "code": "unc_path_refused",
+                },
+                status=400,
+            )
 
         def probe(raw: str) -> tuple[str, bool, bool]:
             resolved = os.path.realpath(os.path.expanduser(raw))
