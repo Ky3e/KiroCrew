@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from ..subagent import (
         _DEDICATED_TOPUP_POLL_SECS,
         _DEDICATED_TOPUP_WAIT_SECS,
+        DEFAULT_MODEL,
         MEMORY_CAUSE_READ_UNANSWERED,
         AcpRuntime,
         AcpSessionProvider,
@@ -110,6 +111,43 @@ def _should_use_session_sharing_impl(self: RunEventCoordinator, info: SubagentIn
     ):
         return False
     return eligible
+
+
+#: Most sub-agents of one parent placed on its KAS process at once; the next one
+#: takes a process of its own. Bounds what one runaway fan-out can load onto the
+#: one process that also serves the parent chat.
+KAS_SHARED_CHILDREN_PER_PARENT = 8
+
+
+def _kas_shared_slot_taken(self: RunEventCoordinator, info: SubagentInfo) -> bool:
+    """Reserve *info* a place on its KAS parent's process, or answer that none is left.
+
+    One KAS process also serves the parent chat, so a fan-out past
+    ``KAS_SHARED_CHILDREN_PER_PARENT`` takes processes of its own rather than
+    loading every child onto it. Counted and reserved with no await in between,
+    so starts racing on one event loop cannot both take the last place: a child
+    counts from this reservation (``_shared_slot_reserved``), before its session
+    exists, until it is done or falls back to a dedicated process. Returns True
+    when the cap is reached, False after reserving (or on a parent that is not KAS).
+    """
+    from kiro_crew.agent_sdk.backends import ACP_BACKEND_KAS
+
+    host = self._manager._get_parent_runtime(info.parent_session_key) or getattr(
+        self._manager._sessions, "_subagent_runtimes", {}
+    ).get(info.parent_session_key)
+    if getattr(host, "acp_backend", None) == ACP_BACKEND_KAS:
+        placed = sum(
+            1
+            for other in list(self._manager._agents.values())
+            if other is not info
+            and other.parent_session_key == info.parent_session_key
+            and (other._session_sharing or getattr(other, "_shared_slot_reserved", False))
+            and not other.done
+        )
+        if placed >= KAS_SHARED_CHILDREN_PER_PARENT:
+            return True
+        info._shared_slot_reserved = True
+    return False
 
 
 def _sharing_plan_impl(
@@ -480,14 +518,16 @@ async def _create_shared_session_impl(
 
     async def _serve_cli_default(handle: Any) -> None:
         # After the bind, which publishes ownership before any cancellable await.
-        # On KAS a shared sub-agent carries no model pin (``_pinned_model_shares``), so
-        # it starts on kiro-cli's chat.defaultModel unless Crew pins its agent one.
+        # A KAS sub-agent with no pin of its own starts on kiro-cli's
+        # chat.defaultModel unless Crew pins its agent one. A run's own pin was
+        # applied in the bind (``_apply_shared_start_model``) and is not overwritten.
         start_agent = agent or getattr(shared_runtime, "_agent", "") or None
+        pin = info.requested_model if info.requested_model != DEFAULT_MODEL else ""
         await serve_kiro_cli_default_model(
             shared_runtime,
             handle,
             cwd,
-            lambda: self._manager._sessions._cfg.acp_effective_model(start_agent, None),
+            lambda: pin or self._manager._sessions._cfg.acp_effective_model(start_agent, None),
         )
 
     async def _late_adopter(handle: Any) -> bool:

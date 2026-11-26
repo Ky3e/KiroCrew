@@ -19,7 +19,7 @@ import pytest
 from kiro_crew.acp.runtime import AcpRuntimeDead
 from kiro_crew.acp.session_provider import AcpSessionProvider
 from kiro_crew.acp.types import AcpEvent
-from kiro_crew.agent_sdk.backends import ACP_BACKEND_CODEX, ACP_BACKEND_KIRO
+from kiro_crew.agent_sdk.backends import ACP_BACKEND_CODEX, ACP_BACKEND_KAS, ACP_BACKEND_KIRO
 from kiro_crew.agent_sdk.capabilities import capabilities_for
 from kiro_crew.providers.base import EVENT_COMPLETE, EVENT_TEXT_CHUNK
 from kiro_crew.subagent import SubagentInfo, SubagentManager
@@ -303,7 +303,11 @@ class TestPinnedModelSharing:
 
     @pytest.mark.parametrize(
         "backend",
-        [pytest.param(ACP_BACKEND_KIRO, id="kiro"), pytest.param(ACP_BACKEND_CODEX, id="codex")],
+        [
+            pytest.param(ACP_BACKEND_KIRO, id="kiro"),
+            pytest.param(ACP_BACKEND_CODEX, id="codex"),
+            pytest.param(ACP_BACKEND_KAS, id="kas"),
+        ],
     )
     @pytest.mark.parametrize(
         "pin",
@@ -1469,6 +1473,20 @@ class TestSharedSessionCliDefaultModel:
         provider = await manager._create_shared_session(
             self._info("kas-spec-model"), "subagent:kas-spec-model", "kc"
         )
+        runtime.create_session.return_value.set_model.assert_not_awaited()
+        assert read_dirs == []
+        await provider.shutdown()
+
+    @pytest.mark.asyncio
+    async def test_a_runs_own_pin_is_not_replaced_by_the_cli_default(self, monkeypatch):
+        """The pin was applied in the bind; the inherited default must not follow it."""
+        from kiro_crew.acp.types import ACP_BACKEND_KAS
+
+        manager, _sessions, runtime, read_dirs = self._manager(monkeypatch, backend=ACP_BACKEND_KAS)
+        info = self._info("kas-run-pin")
+        info.requested_model = "run-pin"
+        with patch("kiro_crew.subagent._apply_shared_start_model", AsyncMock()):
+            provider = await manager._create_shared_session(info, "subagent:kas-run-pin", "kc")
         runtime.create_session.return_value.set_model.assert_not_awaited()
         assert read_dirs == []
         await provider.shutdown()
