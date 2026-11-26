@@ -34,6 +34,20 @@ export const LOCATIONS = {
     },
     placements: [{ surface: 'settings', parent: 'settings.tab.imports', entry: 'content' }],
   },
+  // Settings > Memory, the Audit tab: every write the store made or refused,
+  // with the value before and after and why a refusal happened.
+  'memory.audit-tab': {
+    kind: 'tab',
+    label: { from: 'text', key: 'memoryPage.tab_audit' },
+    terms: {
+      en: [
+        'memory audit', 'memory audit trail', 'memory history', 'memory log', 'what changed in memory',
+        'why was a memory refused', 'refused memories', 'blocked memory', 'who changed this memory',
+      ],
+      'zh-CN': ['记忆审计', '审计记录', '记忆历史', '记忆日志', '记忆改了什么', '为什么拒绝保存记忆', '被拒绝的记忆'],
+    },
+    placements: [{ surface: 'settings', parent: 'settings.tab.memory', entry: 'tab' }],
+  },
   // Settings > Memory, Test recall in the Memories toolbar (the ⋯ sheet on a
   // phone): what a bot gets at session start and for a typed message.
   'memory.test-recall': {
