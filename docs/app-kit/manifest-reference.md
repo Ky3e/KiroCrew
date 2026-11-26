@@ -1849,7 +1849,10 @@ globalThis.kirocrew?.register(activate)  // for the inline path behind a proxy
 The host sends `render` once, after the module is ready. Treat `props` as
 untrusted: an agent wrote it, and it can hold text from a tool result. The
 height is clamped to 40-800 pixels. A link the user clicks in the frame opens
-through the host's link bridge, as for every app frame.
+through the host's link bridge, as for every app frame, but only when it goes to
+a page of this dashboard. A link to another host opens nothing, so show such an
+address as text. The server judges a reply's blocked links in its text, and the
+browser can read an address in a JSON payload differently from that text.
 
 **When it cannot be drawn.** The host draws a card that names the reason and
 keeps the payload readable under **Show the raw data** when: no enabled app

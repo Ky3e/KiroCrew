@@ -152,10 +152,11 @@ describe('AppWidget', () => {
     const activation = () => Object.defineProperty(navigator, 'userActivation', { value: { isActive: true }, configurable: true })
     afterEach(() => { Reflect.deleteProperty(navigator, 'userActivation'); vi.restoreAllMocks() })
 
-    async function asked(url: string, props: { blockedLinks?: readonly BlockedLink[]; linksPending?: boolean }) {
+    async function asked(url: string, props: { blockedLinks?: readonly BlockedLink[]; linksPending?: boolean; body?: string }) {
       activation()
       const open = vi.spyOn(window, 'open').mockReturnValue(null)
-      render(withQuery(<AppWidget use="issue-radar:issue-card" body='{"n": 1}' title="Issue 7" {...props} />))
+      const { body = JSON.stringify({ n: 1, url }), ...rest } = props
+      render(withQuery(<AppWidget use="issue-radar:issue-card" body={body} title="Issue 7" {...rest} />))
       const el = await waitFor(() => {
         const f = document.querySelector<HTMLIFrameElement>('iframe[data-app-widget-frame]')
         if (!f) throw new Error('no frame yet')
@@ -178,8 +179,25 @@ describe('AppWidget', () => {
       expect(screen.queryByRole('button')).toBeNull()
     })
 
-    it('offers any other web link the usual way', async () => {
-      const open = await asked('https://example.com/issue/7', { blockedLinks: [record] })
+    it('opens nothing for an address the payload escapes, which the scan never read', async () => {
+      const escaped = '{"url": "https:\\/\\/attacker.example\\/?d=c2VjcmV0"}'
+      const open = await asked(BLOCKED, { blockedLinks: [], body: escaped })
+      expect(open).not.toHaveBeenCalled()
+      expect(screen.queryByRole('button')).toBeNull()
+    })
+
+    it.each([
+      ['in plain ASCII', 'https://example.com/issue/7'],
+      ['with a full-width host the browser folds to ASCII', 'https://\uff45\uff56\uff49\uff4c.example/?d=c2VjcmV0'],
+      ['with userinfo before the host', 'https://user@evil.example/?d=c2VjcmV0'],
+    ])('opens nothing for a link to another host written %s', async (_case, url) => {
+      const open = await asked(url, { blockedLinks: [] })
+      expect(open).not.toHaveBeenCalled()
+      expect(screen.queryByRole('button')).toBeNull()
+    })
+
+    it('offers a page of this dashboard the usual way', async () => {
+      const open = await asked(new URL('/apps/detail/issue-radar', window.location.origin).href, { blockedLinks: [record] })
       expect(open.mock.calls.length + screen.queryAllByRole('button').length).toBeGreaterThan(0)
     })
   })

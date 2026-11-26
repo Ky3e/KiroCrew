@@ -137,6 +137,15 @@ export default function AppWidget({ use, body, title, blockedLinks = NO_BLOCKED,
   )
 }
 
+/** Whether `url` goes to a host other than this dashboard's. */
+function leavesDashboard(url: string): boolean {
+  try {
+    return new URL(url).origin !== window.location.origin
+  } catch {
+    return true
+  }
+}
+
 function AppWidgetFrame({ widget, props, heading, blockedLinks, linksPending, onFailed }: {
   widget: ResolvedAppWidget
   props: Record<string, unknown>
@@ -152,10 +161,14 @@ function AppWidgetFrame({ widget, props, heading, blockedLinks, linksPending, on
   const [height, setHeight] = useState(DEFAULT_HEIGHT)
   const onFailedRef = useRef(onFailed)
   onFailedRef.current = onFailed
-  // A link the reply's own text draws as a Blocked link chip opens nothing, and
-  // no web link opens while the reply's records are pending.
+  // Only a page of this dashboard opens. The blocked-link records come from the
+  // reply's text, and the browser can read an address in a JSON payload
+  // differently from that text (an escape, a full-width host, userinfo), so a
+  // link to another host was never reliably judged and opens nothing. A link the
+  // reply draws as a Blocked link chip, or any link while the records are
+  // pending, opens nothing either.
   const refuseLink = useCallback(
-    (url: string) => linksPending || blockedLinkFor(url, blockedLinks) !== null,
+    (url: string) => linksPending || blockedLinkFor(url, blockedLinks) !== null || leavesDashboard(url),
     [linksPending, blockedLinks],
   )
   const chip = useFrameLinkBridge([frameRef], undefined, undefined, undefined, refuseLink)

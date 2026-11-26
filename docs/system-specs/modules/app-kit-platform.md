@@ -6505,7 +6505,12 @@ serialized, so it is covered by the signing payload, and `widgets` is in
 - **Links.** The frame opens a link only through `useFrameLinkBridge`, with the
   refusal `WidgetFrame` uses: the renderer passes the reply's blocked-link records
   and pending flag, so a link the reply draws as a Blocked link chip opens nothing,
-  and no web link opens while the records are pending.
+  and no web link opens while the records are pending. A link to another host
+  opens nothing (`leavesDashboard`). The server finds blocked links in the text
+  as written, and the browser can read an address in the payload differently
+  (an escape such as `https:\/\/`, a full-width host it folds to ASCII, userinfo
+  before the host), so no such address was reliably judged. Only a page of this
+  dashboard opens from an app widget.
 - **Fallback.** A bad `use`, an app that is not installed, an app that is turned
   off, no such widget, a body that is not one JSON object within the cap, an app
   list that does not load, a refused mint, a frame that fails, navigates away or is
