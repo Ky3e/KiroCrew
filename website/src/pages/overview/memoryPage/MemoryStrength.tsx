@@ -32,6 +32,14 @@ export function dayUnderLine(start: number, rate: number, line: number): number 
 const FAR_DAYS = 36_500
 /** Days until the line, or null when it is never, or more than a century, away. */
 export const withinReach = (days: number | null) => days === null || days > FAR_DAYS ? null : days
+const DAY_MS = 86_400_000
+/** The moment a row is first under the line: written + its crossing age in whole
+ *  days, the way recall counts age. A stamp with no zone is UTC, as the server
+ *  reads it; with none readable, counted from now. */
+export function crossingDate(written: string | undefined, crossingAge: number, untilDays: number): string {
+  const stamp = written ? Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(written) ? written : `${written}Z`) : NaN
+  return new Date(Number.isFinite(stamp) ? stamp + crossingAge * DAY_MS : Date.now() + untilDays * DAY_MS).toISOString()
+}
 /** A per-day rate as a percent: 0.03 reads "3%". */
 const fmtRate = (rate: number) => fmtNumber(rate, { style: 'percent', maximumFractionDigits: 1 })
 
@@ -66,7 +74,9 @@ function Curve({ start, rate, span, today, line, lit = true }: { start: number; 
 }
 
 /** The detail panel's Strength section for one experience. */
-export function StrengthDetail({ decay, fadeLine, onSaveAsLesson }: { decay: MemoryRecordDecay; fadeLine: number
+export function StrengthDetail({ decay, fadeLine, written, onSaveAsLesson }: { decay: MemoryRecordDecay; fadeLine: number
+  /** When the row was written: its ages tick on that time of day, so the crossing date is counted from it. */
+  written?: string
   /** Copy the text into a new lesson, which never fades; only where lessons can be written. */
   onSaveAsLesson?: () => void }) {
   const { t } = useTranslation()
@@ -78,13 +88,16 @@ export function StrengthDetail({ decay, fadeLine, onSaveAsLesson }: { decay: Mem
     ? t(decay.rate_tag ? 'memoryPage.strength_rate_tag' : 'memoryPage.strength_rate', { rate: fmtRate(decay.rate), tag: decay.rate_tag })
     : t(decay.rate_tag ? 'memoryPage.strength_never_tag' : 'memoryPage.strength_never', { tag: decay.rate_tag })
   const below = until === 0 ? t('memoryPage.strength_tip_faded')
-    : until !== null ? t('memoryPage.strength_below_on', { date: fmtDate(new Date(Date.now() + until * 86_400_000).toISOString()) }) : null
+    : crossing !== null ? t('memoryPage.strength_below_on', { date: fmtDate(crossingDate(written, crossing, until!)) }) : null
   return <section aria-label={t('memoryPage.strength')} className="space-y-2" data-testid="strength-detail">
     <div className="flex items-baseline justify-between gap-2">
       <h4 className="m-0 text-[13px] font-medium text-muted">{t('memoryPage.strength')}</h4>
       <span className={`text-[15px] font-semibold tabular-nums ${decay.state === 'strong' ? 'text-text' : TONE[decay.state]}`}>{fmtScore(decay.strength)}</span>
     </div>
-    <svg role="img" viewBox={`0 0 ${W} ${H}`} className="block h-[88px] w-full" preserveAspectRatio="none"
+    {/* A data chart, not an icon: drawn as TokenStackedAreaChart draws its series. */}
+    <svg
+      role="img" className="block h-[88px] w-full" preserveAspectRatio="none"
+      viewBox={`0 0 ${W} ${H}`}
       aria-label={t('memoryPage.strength_curve_label', { now: fmtScore(decay.strength), start: fmtScore(decay.start) })}>
       <Curve start={decay.start} rate={decay.rate} span={span} today={decay.days_old} line={fadeLine} />
     </svg>
@@ -104,8 +117,12 @@ export function StoreFadeChart({ decay }: { decay: MemoryStoreDecay }) {
   const days = decay.rates.map(rate => withinReach(dayUnderLine(TYPICAL_START, rate.rate, decay.fade_line)))
   const span = Math.max(30, ...days.map(day => (day ?? 0) * 1.2))
   const caption = t('memoryPage.strength_chart_caption', { importance: fmtNumber(0.5) })
-  return <div className="space-y-1.5 pb-1" data-testid="store-fade-chart">
-    <svg role="img" viewBox={`0 0 ${W} ${H}`} className="block h-16 w-full" preserveAspectRatio="none" aria-label={caption}>
+  // A panel of its own, so the rates read as a picture and not as more filter rows.
+  return <div className="mb-2 space-y-1.5 rounded-lg bg-bg-hover p-2.5" data-testid="store-fade-chart">
+    <svg
+      role="img" className="block h-16 w-full" preserveAspectRatio="none"
+      viewBox={`0 0 ${W} ${H}`}
+      aria-label={caption}>
       {/* The default rate is the lit curve; tag rates step down. */}
       {decay.rates.map((rate, index) => <Curve key={rate.tag ?? ''} start={TYPICAL_START} rate={rate.rate} span={span} line={decay.fade_line} lit={index === 0} />).reverse()}
     </svg>

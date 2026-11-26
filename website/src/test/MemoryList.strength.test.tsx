@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { renderWithProviders } from './helpers'
-import { dayUnderLine, strengthAt } from '../pages/overview/memoryPage/MemoryStrength'
+import { crossingDate, dayUnderLine, strengthAt } from '../pages/overview/memoryPage/MemoryStrength'
 import { memoryRecordParams } from '../api/client/memory'
 
 /**
@@ -49,6 +49,14 @@ describe('the fade curve', () => {
     // memory_decay.days_to_line: an importance-0.5 row at 0.03 a day is under on day 27.
     expect(dayUnderLine(0.85, 0.03, FADE_LINE)).toBe(27)
     expect(dayUnderLine(0.85, 0, FADE_LINE)).toBeNull()
+  })
+})
+
+describe('the crossing date', () => {
+  it('counts whole days from when the row was written, not from now', () => {
+    // Written Nov 1 23:30 UTC, first under the line at age 27: Nov 28 23:30 UTC.
+    expect(crossingDate('2026-11-01T23:30:00+00:00', 27, 3)).toBe('2026-11-28T23:30:00.000Z')
+    expect(crossingDate('2026-11-01T23:30:00', 27, 3)).toBe('2026-11-28T23:30:00.000Z')
   })
 })
 

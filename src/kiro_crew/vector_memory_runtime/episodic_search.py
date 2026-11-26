@@ -906,9 +906,13 @@ def row_age_days(row, now: datetime) -> int:
     from kiro_crew import vector_memory as vm  # circular import: the facade imports this module
 
     try:
-        created = vm.datetime.fromisoformat(row["created_at"])
-        if created.tzinfo is None:
-            created = created.replace(tzinfo=timezone.utc)
+        # Recall's own reader, so every row recall can score has the same age here.
+        return episode_age_days(row["created_at"], now)
+    except (TypeError, ValueError):
+        pass
+    # A stamp recall cannot read (it would raise there): no zone is UTC, unreadable is today.
+    try:
+        created = vm.datetime.fromisoformat(row["created_at"]).replace(tzinfo=timezone.utc)
         return max(0, (now - created).days)
     except (TypeError, ValueError):
         return 0

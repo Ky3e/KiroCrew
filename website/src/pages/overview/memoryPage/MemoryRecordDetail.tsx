@@ -47,7 +47,7 @@ export function MemoryRecordDetail({ store, row, phone, chip, fadeLine, onSaveAs
     <dl className="m-0 grid gap-x-3 gap-y-2.5 text-[13px] leading-5" style={{ gridTemplateColumns: '96px minmax(0,1fr)' }}>
       {fields.map(([label, value]) => [<dt key={`${label}:k`} className="text-muted">{label}</dt>, <dd key={label} className="m-0 min-w-0 text-text">{value}</dd>])}
     </dl>
-    {row.decay && fadeLine !== undefined && <StrengthDetail decay={row.decay} fadeLine={fadeLine} onSaveAsLesson={onSaveAsLesson} />}
+    {row.decay && fadeLine !== undefined && <StrengthDetail decay={row.decay} fadeLine={fadeLine} written={row.created_at} onSaveAsLesson={onSaveAsLesson} />}
     <RecordProvenance row={row} source={false} />
     <RecordHistory store={store} row={row} onRestore={onRestore} onKeepCurrent={onKeepCurrent} onProposal={onProposal} />
   </div>
