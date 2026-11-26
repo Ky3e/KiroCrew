@@ -396,6 +396,81 @@ _GIT_EXEC_NEUTRALIZER_PAIRS: tuple[tuple[str, str], ...] = (
     _GIT_NO_FSMONITOR_PAIR,
 )
 
+#: Refuses HTTP redirects on the gateway's registry fetches only
+#: (``checkout._HOOKS_NEUTRALIZER_ARGV``): the clone-host check vets only the URL
+#: git is given, so git must not follow a redirect to a host that check never saw.
+#: The operator's own ``kirocrew app install <url>`` has no such check and keeps
+#: git's default, so a renamed repository still installs there.
+_GIT_NO_REDIRECTS_PAIR: tuple[str, str] = ("http.followRedirects", "false")
+
+
+def _git_url_username_form(url: str) -> str:
+    """``scheme://user@host[:port]/path`` for an HTTP(S) *url*, or ``""``.
+
+    The password, query and fragment are dropped: this is a config-matching key,
+    never a transport URL, and a password must never enter argv. Returns ``""``
+    when *url* is not HTTP(S) or carries no username.
+    """
+    target = (url or "").strip()
+    scheme, sep, rest = target.partition("://")
+    if not sep or scheme.lower() not in {"http", "https"}:
+        return ""
+    cut = len(rest)
+    for delimiter in "/?#":
+        found = rest.find(delimiter)
+        if found >= 0:
+            cut = min(cut, found)
+    authority, tail = rest[:cut], rest[cut:]
+    userinfo, at, hostport = authority.rpartition("@")
+    if not at:
+        return ""
+    username = userinfo.split(":", 1)[0]
+    if not username:
+        return ""
+    path = tail
+    for delimiter in "?#":
+        found = path.find(delimiter)
+        if found >= 0:
+            path = path[:found]
+    return f"{scheme.lower()}://{username}@{hostport}{path}"
+
+
+def _redirect_refusal_argv(git_url: str, credential_target: str = "") -> tuple[str, ...]:
+    """``-c`` overrides that keep git from following a redirect for *git_url*.
+
+    The generic ``http.followRedirects=false`` lives in
+    ``checkout._HOOKS_NEUTRALIZER_ARGV``, but git lets a URL-specific
+    ``http.<url>.followRedirects`` beat a generic one, and a reused checkout's
+    own ``.git/config`` is read on the pull. An attacker-tampered
+    ``http.<repo-url>.followRedirects=true`` there would otherwise win. So each
+    registry network spawn also pins the URL-specific key to ``false``.
+
+    Git picks the config URL that is the longest matching prefix of the request
+    URL, and breaks a tie by definition order; a command-line ``-c`` is defined
+    after every file, so our key wins any tie. Both the trailing-slash and the
+    bare form are pinned because git normalises a trailing ``/`` away.
+
+    Git's URL matching DOES compare a username when the config key carries one,
+    and ranks such a key above a username-free one. The fetch URL git actually
+    uses is *credential_target* (``_git_transport_env`` rewrites to it), so when
+    it carries a username, pin that exact ``user@host/path`` form too -- password
+    stripped, because this is a config key, not a transport URL, and argv must
+    never carry a secret. The credential-free *git_url* key still covers the
+    common uncredentialed fetch.
+    """
+    key_urls: list[str] = []
+    stripped = _strip_git_target_userinfo(git_url).strip()
+    if stripped.partition("://")[0].lower() in {"http", "https"}:
+        key_urls.append(stripped.rstrip("/"))
+    username_form = _git_url_username_form(credential_target)
+    if username_form:
+        key_urls.append(username_form.rstrip("/"))
+    argv: list[str] = []
+    for base in key_urls:
+        for key_url in (base, base + "/"):
+            argv += ["-c", f"http.{key_url}.followRedirects=false"]
+    return tuple(argv)
+
 
 def _lfs_endpoint_pin_argv(git_url: str) -> tuple[str, ...]:
     """``-c lfs.url=<endpoint>`` that pins Git LFS to *git_url*'s own host.
@@ -678,6 +753,14 @@ def _is_ssh_auth_refusal(low: str) -> bool:
 #: the private-repository check in ``gh_credential`` can still read it.
 _GIT_REPOSITORY_NOT_FOUND_LABEL = "the repository was not found"
 
+#: libcurl's line for a redirect git refused to follow ("The requested URL returned
+#: error: 301"; ``http.followRedirects`` is off on every registry fetch), and the
+#: fixed label a redacted fetch keeps for it. :func:`_git_output_is_redirect` reads both.
+_GIT_REDIRECT_MARKERS: tuple[str, ...] = tuple(
+    f"returned error: {code}" for code in (301, 302, 303, 307, 308)
+)
+_GIT_REDIRECT_LABEL = "the server answered with a redirect"
+
 _GIT_FAILURE_CLASS_LABELS: tuple[tuple[str, str], ...] = (
     # libcurl's proxy phrasings ("Could not resolve proxy: …", "Received HTTP code
     # 407 from proxy after CONNECT", "CONNECT tunnel failed, response 407", "Proxy
@@ -720,11 +803,18 @@ _GIT_FAILURE_CLASS_LABELS: tuple[tuple[str, str], ...] = (
     ("ssl backend", "a TLS/SSL error occurred"),
     ("gnutls_handshake", "a TLS/SSL error occurred"),
     ("tls handshake", "a TLS/SSL error occurred"),
+    *((marker, _GIT_REDIRECT_LABEL) for marker in _GIT_REDIRECT_MARKERS),
     # GitHub's "remote: Repository not found." phrase contains spaces that no
     # repo URL path can match. Last so it cannot shadow a more specific failure;
     # deliberately not bare "not found" or git's URL-bearing fatal line.
     ("repository not found", _GIT_REPOSITORY_NOT_FOUND_LABEL),
 )
+
+
+def _git_output_is_redirect(text: str) -> bool:
+    """Whether git *text* (raw, or reduced to a fixed label) says it refused a redirect."""
+    low = text.lower()
+    return _GIT_REDIRECT_LABEL in low or any(marker in low for marker in _GIT_REDIRECT_MARKERS)
 
 
 def _git_output_is_auth_shaped(text: str) -> bool:

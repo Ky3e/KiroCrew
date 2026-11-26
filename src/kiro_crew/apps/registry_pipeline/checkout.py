@@ -32,8 +32,10 @@ from kiro_crew.apps.registry_pipeline.gh_credential import (
 )
 from kiro_crew.apps.registry_pipeline.git_targets import (
     _GIT_EXEC_NEUTRALIZER_PAIRS,
+    _GIT_NO_REDIRECTS_PAIR,
     _git_network_failure_hint,
     _git_output_is_auth_shaped,
+    _git_output_is_redirect,
     _git_output_is_ssh_name_unresolved,
     _git_target_is_unsupported,
     _git_transport_env,
@@ -41,6 +43,7 @@ from kiro_crew.apps.registry_pipeline.git_targets import (
     _lfs_endpoint_pin_argv,
     _loggable_git_transport_output,
     _redacted_git_failure_class,
+    _redirect_refusal_argv,
     _same_git_url_text,
     _strip_git_target_userinfo,
 )
@@ -89,9 +92,12 @@ _CLONE_TIMEOUT = 60
 # non-directory OS device under which git finds no hook and into which no directory
 # can be created (the ``_HOOKS_SINK`` reasoning in ``dashboard/handlers/worktree.py``);
 # ``core.fsmonitor=false`` refuses a repo-named filesystem-monitor command git would
-# otherwise spawn on index reads.
+# otherwise spawn on index reads. ``http.followRedirects=false`` keeps each network
+# step on the host the clone-host check approved; it is inert on the local steps.
 _HOOKS_NEUTRALIZER_ARGV: tuple[str, ...] = tuple(
-    token for key, value in _GIT_EXEC_NEUTRALIZER_PAIRS for token in ("-c", f"{key}={value}")
+    token
+    for key, value in (*_GIT_EXEC_NEUTRALIZER_PAIRS, _GIT_NO_REDIRECTS_PAIR)
+    for token in ("-c", f"{key}={value}")
 )
 
 
@@ -122,6 +128,16 @@ def _with_network_hint(error: str, output: str, *, named: bool = False) -> str:
         # so say what was measured. A proxy-only network looks exactly like this.
         return f"{error}: timed out; {hint}"
     return f"{error}: could not reach the remote; {hint}"
+
+
+def _with_redirect_hint(error: str, output: str) -> str:
+    """*error*, plus what to do when *output* says git refused an HTTP redirect."""
+    if not _git_output_is_redirect(output):
+        return error
+    return (
+        f"{error}: the server redirects, and app fetches do not follow redirects; "
+        "list the repository's current URL in the registry"
+    )
 
 
 #: The slug and fixed sentence for a credential-free (index-originated) fetch of an
@@ -320,6 +336,66 @@ async def _clone_origin_url(dest: Path) -> str | None:
     return origin_out.decode(errors="replace").strip()
 
 
+async def _reused_checkout_redirect_config(dest: Path) -> str | None:
+    """A local-config ``http.*.followRedirects`` entry in *dest* that is not ``false``.
+
+    A reused checkout's own ``.git/config`` is read on the pull, and git ranks a
+    URL- or username-specific ``http.<url>.followRedirects=true`` above the
+    command-line refusals. The per-URL ``-c`` keys cover the spellings we can
+    predict, but this reads the checkout's config directly and refuses the fetch
+    outright when ANY such entry is enabled -- closing the class whatever the key
+    spelling. ``git config --get-regexp`` lowercases keys and follows ``include``
+    directives, so a hidden include cannot smuggle one past. Returns the offending
+    ``key=value`` (credential-free: the key is a config name, the value true/1),
+    or None when every entry is ``false`` or none exists. A read failure returns
+    None: the fetch's own ``-c`` keys and the origin gate still apply, and a
+    missing ``git`` is handled by the fetch.
+    """
+    if not await asyncio.to_thread((dest / ".git").is_dir):
+        return None
+    config_cmd, _cleanup = await wrap_argv_async(
+        [
+            "git",
+            *_HOOKS_NEUTRALIZER_ARGV,
+            "config",
+            "--local",
+            "--get-regexp",
+            r"^http\..*\.followredirects$",
+        ],
+        mode="strict",  # credential-free local read; ~/.ssh stays hidden
+        _prepare=wrap_argv,
+    )
+    config_cmd = cgroup_scope_argv(config_cmd)
+    try:
+        proc = await create_subprocess_limited(
+            *config_cmd,
+            cwd=str(dest),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+            env=anonymous_git_env(),
+            start_new_session=platform_compat.IS_POSIX,
+            creationflags=platform_compat.CREATE_NEW_PROCESS_GROUP,
+        )
+    except OSError:
+        return None
+    try:
+        out, _ = await asyncio.wait_for(proc.communicate(), timeout=10)
+    except asyncio.TimeoutError:
+        await _kill_process_group(proc)
+        return None
+    except asyncio.CancelledError:
+        await _kill_process_group(proc)
+        raise
+    # Exit 1 is "no matching key" -- not an error, nothing is enabled.
+    if proc.returncode not in (0, 1):
+        return None
+    for line in out.decode(errors="replace").splitlines():
+        key, _, value = line.partition(" ")
+        if value.strip().lower() != "false":
+            return f"{key}={value.strip()}"
+    return None
+
+
 async def _clone_origin_matches(dest: Path, git_url: str) -> bool:
     """Whether *dest* is a checkout of the same repository as *git_url*.
 
@@ -481,7 +557,13 @@ async def _git_fetch_ref(
         # checkout. The ``-c`` overrides go right after the executable so they
         # precede the subcommand. The LFS pin keeps a smudge in the checkout on
         # *git_url*'s host whatever the repository's ``.lfsconfig`` names.
-        argv = [argv[0], *_HOOKS_NEUTRALIZER_ARGV, *_lfs_endpoint_pin_argv(git_url), *argv[1:]]
+        argv = [
+            argv[0],
+            *_HOOKS_NEUTRALIZER_ARGV,
+            *_lfs_endpoint_pin_argv(git_url),
+            *_redirect_refusal_argv(git_url, credential_target),
+            *argv[1:],
+        ]
         fwd = forward_ssh_auth_sock and network  # the agent socket is for the network step only
         # The gh sign-in step keeps its tier and gets back `~/.config/gh` alone, the
         # one folder `gh` reads its sign-in from; every other credential folder the
@@ -665,7 +747,9 @@ async def _git_fetch_ref(
             return {
                 "ok": False,
                 "name": dest.name,
-                "error": _with_network_hint(f"git fetch failed (exit {code})", out),
+                "error": _with_redirect_hint(
+                    _with_network_hint(f"git fetch failed (exit {code})", out), out
+                ),
             }
 
         if tag_ref:
@@ -1141,6 +1225,24 @@ async def _git_clone_or_pull(
             # mismatched checkout was moved aside and never reused. Pull from the
             # current registry URL through the command-scoped rewrite, so rotated
             # credentials take effect without ever being persisted in origin.)
+            # A reused checkout's own config is read on the pull; refuse before any
+            # network op if it turns redirects back on under any key spelling.
+            bad_redirect = await _reused_checkout_redirect_config(dest)
+            if bad_redirect is not None:
+                log_lines.append(
+                    f"Refusing to update {dest.name}: its checkout config enables "
+                    f"HTTP redirects ({bad_redirect})"
+                )
+                return {
+                    "ok": False,
+                    "name": dest.name,
+                    "code": "checkout_enables_redirects",
+                    "error": (
+                        "The existing app checkout's git config enables HTTP redirects, "
+                        "which app fetches do not follow. Remove or fix it manually at "
+                        f"{dest} and retry the install."
+                    ),
+                }
             log_lines.append(
                 f"Updating {_strip_git_target_userinfo(git_url)} (branch: {branch})..."
             )
@@ -1154,6 +1256,7 @@ async def _git_clone_or_pull(
                     "git",
                     *_HOOKS_NEUTRALIZER_ARGV,
                     *_lfs_endpoint_pin_argv(git_url),
+                    *_redirect_refusal_argv(git_url, credential_target),
                     "pull",
                     "--ff-only",
                     git_url,
@@ -1195,8 +1298,12 @@ async def _git_clone_or_pull(
                             return refusal
                     return {
                         "ok": False,
-                        "error": _with_network_hint(
-                            f"git pull failed (exit {proc.returncode}); not installing stale code",
+                        "error": _with_redirect_hint(
+                            _with_network_hint(
+                                f"git pull failed (exit {proc.returncode}); "
+                                "not installing stale code",
+                                pull_output,
+                            ),
                             pull_output,
                         ),
                     }
@@ -1261,6 +1368,7 @@ async def _git_clone_or_pull(
             "git",
             *_HOOKS_NEUTRALIZER_ARGV,
             *_lfs_endpoint_pin_argv(git_url),
+            *_redirect_refusal_argv(git_url, credential_target),
             "clone",
             "--depth",
             "1",
@@ -1371,7 +1479,7 @@ async def _git_clone_or_pull(
                 # Not auth-shaped: bare honest failure, with the redacted
                 # (allowlisted, constant) failure class when one is recognized.
                 failure_class = _redacted_git_failure_class(clone_output)
-                if failure_class:
+                if failure_class and not _git_output_is_redirect(clone_output):
                     return {
                         "ok": False,
                         "name": dest.name,
@@ -1385,13 +1493,17 @@ async def _git_clone_or_pull(
                     "ok": False,
                     "name": dest.name,
                     "code": "git_clone_failed",
-                    "error": _with_network_hint("git clone failed", clone_output),
+                    "error": _with_redirect_hint(
+                        _with_network_hint("git clone failed", clone_output), clone_output
+                    ),
                 }
             return {
                 "ok": False,
                 "name": dest.name,
                 "code": "git_clone_failed",
-                "error": _with_network_hint("git clone failed", clone_output),
+                "error": _with_redirect_hint(
+                    _with_network_hint("git clone failed", clone_output), clone_output
+                ),
             }
         clone_succeeded = True
         return None

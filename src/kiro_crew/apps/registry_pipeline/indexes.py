@@ -53,6 +53,7 @@ from kiro_crew.apps.registry_pipeline.git_targets import (
     _looks_like_git_url,
     _public_registry_name,
     _redact_url_userinfo,
+    _redirect_refusal_argv,
     _same_git_target,
     _strip_git_target_userinfo,
 )
@@ -423,6 +424,7 @@ async def _fetch_external_registry_index(
                 "git",
                 *_HOOKS_NEUTRALIZER_ARGV,
                 *_lfs_endpoint_pin_argv(git_url),
+                *_redirect_refusal_argv(git_url, credential_target),
                 "clone",
                 "--depth",
                 "1",

@@ -494,6 +494,11 @@ class TestGitFetchAndPullFailClosed:
         monkeypatch.setattr(registry, "is_clone_host_trusted", lambda target: True)
         monkeypatch.setattr(registry, "_clone_origin_url", _origin)
         monkeypatch.setattr(registry, "_read_clone_branch", lambda path: "main")
+
+        async def _no_redirect_config(path):
+            return None
+
+        monkeypatch.setattr(registry, "_reused_checkout_redirect_config", _no_redirect_config)
         spawned = self._spawns(
             monkeypatch,
             [(("git", "-c"), lambda a, k: self._Proc(returncode=1, output=b"no"))],
@@ -504,11 +509,24 @@ class TestGitFetchAndPullFailClosed:
             "ok": False,
             "error": "git pull failed (exit 1); not installing stale code",
         }
-        # The hooks/fsmonitor neutralizer and the LFS endpoint pin are spliced in
-        # right after ``git``.
-        hooks = ("-c", f"core.hooksPath={os.devnull}", "-c", "core.fsmonitor=false")
+        # The hooks/fsmonitor/redirect neutralizer, the LFS endpoint pin and the
+        # URL-specific redirect refusal are spliced in right after ``git``.
+        hooks = (
+            "-c",
+            f"core.hooksPath={os.devnull}",
+            "-c",
+            "core.fsmonitor=false",
+            "-c",
+            "http.followRedirects=false",
+        )
         lfs_pin = ("-c", f"lfs.url={url}/info/lfs")
-        assert spawned == [("git", *hooks, *lfs_pin, "pull", "--ff-only", url, "main")]
+        redirect = (
+            "-c",
+            f"http.{url}.followRedirects=false",
+            "-c",
+            f"http.{url}/.followRedirects=false",
+        )
+        assert spawned == [("git", *hooks, *lfs_pin, *redirect, "pull", "--ff-only", url, "main")]
         assert log[-1] == "git pull failed (exit 1) — aborting"
         assert (dest / ".git").is_dir(), "a failed pull leaves the checkout in place"
 
@@ -538,6 +556,10 @@ class TestGitFetchAndPullFailClosed:
         async def _no_signal(*args, **kwargs):
             raise AssertionError("the group kill must go through the patched seam")
 
+        async def _no_redirect_config(path):
+            return None
+
+        monkeypatch.setattr(registry, "_reused_checkout_redirect_config", _no_redirect_config)
         monkeypatch.setattr(registry, "_kill_process_group", _kill)
         monkeypatch.setattr(registry.platform_compat, "kill_process_tree_async", _no_signal)
         monkeypatch.setattr(registry.platform_compat, "kill_and_reap", _no_signal)
