@@ -15,18 +15,12 @@ import { fmtDate, fmtNumber } from '../../../i18n/format'
 import type { MemoryRecordDecay, MemoryStoreDecay, MemoryStrengthState } from '../../../types/memoryEditing'
 import { fmtScore } from './memoryListView'
 
-// A row with no recorded importance starts at 0.7 + 0.3 × 0.5 (`episodic_search.row_importance`).
-export const TYPICAL_START = 0.85
 const TONE: Record<MemoryStrengthState, string> = { strong: 'text-muted', fading: 'text-warn-text', faded: 'text-danger-text' }
 const BAR: Record<MemoryStrengthState, string> = { strong: 'bg-accent', fading: 'bg-warn', faded: 'bg-danger' }
 
+// Draws the curve between the points the server gives; every number shown
+// (strength, the line, the crossing day) is the server's.
 export const strengthAt = (start: number, rate: number, day: number) => start * Math.exp(-rate * Math.max(0, day))
-/** The first whole day a row of this start is under the line; null when it never is. */
-export function dayUnderLine(start: number, rate: number, line: number): number | null {
-  if (start < line) return 0
-  if (rate <= 0) return null
-  return Math.floor(Math.log(start / line) / rate) + 1
-}
 // A store accepts any rate from 0 up, so a tiny one puts the crossing past any
 // date JavaScript can hold. Past a century it reads as never.
 const FAR_DAYS = 36_500
@@ -110,18 +104,18 @@ export function StrengthDetail({ decay, fadeLine, written, onSaveAsLesson }: { d
   </section>
 }
 
-/** The rail's picture of the store: each fade rate's curve at importance 0.5,
- *  the line, and the day each crosses it. */
+/** The rail's picture of the store: each fade rate's curve at the server's chart
+ *  importance, the line, and the day the server says each crosses it. */
 export function StoreFadeChart({ decay }: { decay: MemoryStoreDecay }) {
   const { t } = useTranslation()
-  const days = decay.rates.map(rate => withinReach(dayUnderLine(TYPICAL_START, rate.rate, decay.fade_line)))
+  const days = decay.rates.map(rate => withinReach(rate.days_to_line))
   const span = Math.max(30, ...days.map(day => (day ?? 0) * 1.2))
   // One sentence per rate, the day counted from the live rate.
   const lines = decay.rates.map((rate, index) => {
     const label = rate.tag === null ? t('memoryPage.strength_default_rate') : `#${rate.tag}`
     const day = days[index]
     return day === null ? t('memoryPage.strength_rate_steady', { label })
-      : t('memoryPage.strength_rate_outrank', { label, count: day, days: fmtNumber(day), importance: fmtNumber(0.5) })
+      : t('memoryPage.strength_rate_outrank', { label, count: day, days: fmtNumber(day), importance: fmtNumber(decay.importance) })
   })
   // A panel of its own, so the rates read as a picture and not as more filter rows.
   return <div className="mb-2 space-y-1.5 rounded-lg bg-bg-hover p-2.5" data-testid="store-fade-chart">
@@ -130,7 +124,7 @@ export function StoreFadeChart({ decay }: { decay: MemoryStoreDecay }) {
       viewBox={`0 0 ${W} ${H}`}
       aria-label={lines.join(' ')}>
       {/* The default rate is the lit curve; tag rates step down. */}
-      {decay.rates.map((rate, index) => <Curve key={rate.tag ?? ''} start={TYPICAL_START} rate={rate.rate} span={span} line={decay.fade_line} lit={index === 0} />).reverse()}
+      {decay.rates.map((rate, index) => <Curve key={rate.tag ?? ''} start={decay.start} rate={rate.rate} span={span} line={decay.fade_line} lit={index === 0} />).reverse()}
     </svg>
     {lines.map((line, index) => <p key={decay.rates[index].tag ?? ''} className={`m-0 text-[12px] leading-5 ${index === 0 ? 'text-text' : 'text-muted'}`}>{line}</p>)}
   </div>

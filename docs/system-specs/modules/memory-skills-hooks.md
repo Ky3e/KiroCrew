@@ -3367,7 +3367,7 @@ one place the formula lives; the FAISS rung, the vectorised scoring set and
 score recall returns for an exact match, on both the vectorised and the stdlib
 path.
 
-- **Fade line** `FADE_LINE` = `_EPISODIC_RELEVANCE_THRESHOLD × 0.7` = 0.385:
+- **Fade line** `FADE_LINE` = `recall_score(_EPISODIC_RELEVANCE_THRESHOLD, 0, 0, 0)` = 0.385:
   the score of a memory written today at importance 0 that just clears the
   short-text gate. Below it, even an exact match ranks under any such new
   memory. The row is still stored and still admitted on a close match.
@@ -3384,7 +3384,9 @@ path.
   `rate_tag`, `days_old`, `days_to_line`, `state`) to each V1 experience, after
   its revision hash, so the hash does not move with the day; a `strength` sort
   and facet; and, with `facets=1` on a V1 store, the store's
-  `decay` (`fade_line`, `soon_days`, `rates`). A cached summary keeps the terms
+  `decay` (`fade_line`, `importance`, `start`, and `rates`, each with its
+  `days_to_line` from `memory_decay.days_to_line`). The page shows these
+  numbers and works none of them out itself. A cached summary keeps the terms
   its strength comes from (`memory_decay.summary_terms`), and every listing
   recomputes strength and band from them (`memory_decay.refresh`), so a row
   that ages past the line moves band with no write; the facet-count cache keys

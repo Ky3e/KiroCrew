@@ -74,11 +74,23 @@ def test_bands_rate_source_and_days_to_the_fade_line(tmp_path, opened):
     assert kept["days_to_line"] is None and kept["state"] == memory_decay.STRONG
     assert decay["old note about the deploy"]["rate_tag"] is None
     assert body["facets"]["strength"] == {"strong": 2, "fading": 1, "faded": 1}
+    # The rail's day per rate is the same crossing the rows use: 27 at the default rate.
     assert body["decay"] == {
         "fade_line": 0.385,
-        "soon_days": 7,
-        "rates": [{"tag": None, "rate": 0.03}, {"tag": "keep", "rate": 0.0}],
+        "importance": 0.5,
+        "start": 0.85,
+        "rates": [
+            {"tag": None, "rate": 0.03, "days_to_line": 27},
+            {"tag": "keep", "rate": 0.0, "days_to_line": None},
+        ],
     }
+
+
+def test_the_fade_line_is_recalls_score_for_a_new_row_at_the_gate():
+    from kiro_crew.vector_memory_runtime import episodic_search
+
+    gate = episodic_search._EPISODIC_RELEVANCE_THRESHOLD
+    assert memory_decay.FADE_LINE == round(episodic_search.recall_score(gate, 0.0, 0.03, 0), 4)
 
 
 def test_strength_filters_and_sorts_the_list(tmp_path, opened):

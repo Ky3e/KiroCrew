@@ -40,7 +40,13 @@ export type MemoryRecordDecay = {
   state: MemoryStrengthState
 }
 /** The store's fade rates and line (`memory_decay.store_decay`); V1 stores only. */
-export type MemoryStoreDecay = { fade_line: number; soon_days: number; rates: { tag: string | null; rate: number }[] }
+export type MemoryStoreDecay = {
+  fade_line: number
+  /** The importance the per-rate lines are about, and its strength on the day it is written. */
+  importance: number; start: number
+  /** Each rate, and the age at which that row is first under the line (null: never). */
+  rates: { tag: string | null; rate: number; days_to_line: number | null }[]
+}
 export type MemoryRecordRef = { kind: MemoryRecordKind; id: string }
 export type MemoryRecordSelection = { items: (MemoryRecordRef & { revision: string })[] }
   | { query: MemoryRecordQuery; exclude: MemoryRecordRef[] }

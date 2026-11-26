@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { renderWithProviders } from './helpers'
-import { crossingDate, dayUnderLine, strengthAt } from '../pages/overview/memoryPage/MemoryStrength'
+import { crossingDate, strengthAt } from '../pages/overview/memoryPage/MemoryStrength'
 import { memoryRecordParams } from '../api/client/memory'
 
 /**
@@ -18,7 +18,7 @@ vi.mock('../api/client', () => ({ api }))
 const { default: MemoryList } = await import('../pages/overview/memoryPage/MemoryList')
 
 const FADE_LINE = 0.385
-const STORE_DECAY = { fade_line: FADE_LINE, soon_days: 7, rates: [{ tag: null, rate: 0.03 }, { tag: 'keep', rate: 0 }] }
+const STORE_DECAY = { fade_line: FADE_LINE, importance: 0.5, start: 0.85, rates: [{ tag: null, rate: 0.03, days_to_line: 27 }, { tag: 'keep', rate: 0, days_to_line: null }] }
 const FADED = {
   kind: 'episode', id: 'ep-old', text: 'Reran shard 8 after a worktree timeout', tags: '[]', importance: 0.5, source: 'consolidation',
   updated_at: '2026-10-01T10:00:00Z', created_at: '2026-10-01T10:00:00Z', revision: 'c'.repeat(64),
@@ -44,11 +44,8 @@ beforeEach(() => {
 })
 
 describe('the fade curve', () => {
-  it('extends the server formula and crosses the line on the day recall would', () => {
+  it('draws through the strength the server sends for today', () => {
     expect(strengthAt(0.85, 0.03, 40)).toBeCloseTo(FADED.decay.strength, 4)
-    // memory_decay.days_to_line: an importance-0.5 row at 0.03 a day is under on day 27.
-    expect(dayUnderLine(0.85, 0.03, FADE_LINE)).toBe(27)
-    expect(dayUnderLine(0.85, 0, FADE_LINE)).toBeNull()
   })
 })
 
@@ -108,16 +105,16 @@ describe('strength on the memory list', () => {
     expect(within(detail).queryByRole('button', { name: 'Save as lesson' })).toBeNull()
   })
 
-  it('counts the rail sentence’s day from the store’s own rate', async () => {
-    api.memoryRecords.mockResolvedValue({ entries: [FADED], total: 1, has_more: false, facets: FACETS, decay: { ...STORE_DECAY, rates: [{ tag: null, rate: 0.06 }] } })
+  it('reads the rail sentence’s day from the server, never working it out itself', async () => {
+    // The server's day for 0.06 a day is 14; a different number here proves the page does no math of its own.
+    api.memoryRecords.mockResolvedValue({ entries: [FADED], total: 1, has_more: false, facets: FACETS, decay: { ...STORE_DECAY, rates: [{ tag: null, rate: 0.06, days_to_line: 15 }] } })
     renderWithProviders(<List />)
-    // ln(0.85 / 0.385) / 0.06 = 13.2, so the first whole day under the line is 14.
-    expect(await screen.findByText('Default rate: new memories outrank one at importance 0.5 after 14 days')).toBeInTheDocument()
+    expect(await screen.findByText('Default rate: new memories outrank one at importance 0.5 after 15 days')).toBeInTheDocument()
   })
 
   it('opens a row whose crossing is past any date JavaScript holds', async () => {
     const slow = { ...FADED, decay: { ...FADED.decay, strength: 0.85, rate: 1e-9, days_to_line: 791_993_016, state: 'strong' } }
-    api.memoryRecords.mockResolvedValue({ entries: [slow], total: 1, has_more: false, facets: FACETS, decay: { ...STORE_DECAY, rates: [{ tag: null, rate: 1e-9 }] } })
+    api.memoryRecords.mockResolvedValue({ entries: [slow], total: 1, has_more: false, facets: FACETS, decay: { ...STORE_DECAY, rates: [{ tag: null, rate: 1e-9, days_to_line: 791_993_016 }] } })
     renderWithProviders(<List />)
     const rows = await screen.findByRole('list', { name: 'Memories' })
     fireEvent.click(within(rows).getByRole('button', { name: 'View details' }))

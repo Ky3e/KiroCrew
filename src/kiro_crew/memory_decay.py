@@ -26,8 +26,14 @@ from typing import Any
 from kiro_crew.vector_memory_runtime import episodic_search
 
 #: A memory under this strength ranks below every new memory that clears the
-#: relevance gate, even on an exact match.
-FADE_LINE = round(episodic_search._EPISODIC_RELEVANCE_THRESHOLD * 0.7, 4)
+#: relevance gate, even on an exact match: recall's own score for a memory written
+#: today, at importance 0, matched at exactly the gate.
+FADE_LINE = round(
+    episodic_search.recall_score(episodic_search._EPISODIC_RELEVANCE_THRESHOLD, 0.0, 0.0, 0), 4
+)
+#: The importance the rail's per-rate sentences are about: recall's own default
+#: for a row with none recorded.
+CHART_IMPORTANCE = episodic_search.row_importance({"importance": None})
 #: "Fading soon" means the row crosses the fade line within this many days. A
 #: week: at the default rate an importance-0.5 row crosses on day 27, so a month
 #: would call nearly every new row fading.
@@ -138,7 +144,20 @@ def refresh(summaries: list[dict[str, Any]], now: datetime) -> int:
 
 
 def store_decay(store: Any) -> dict[str, Any]:
-    """The store's fade rates for the page's chart: the default, then each tag's."""
-    rates = [{"tag": None, "rate": store._decay_default}]
-    rates += [{"tag": tag, "rate": rate} for tag, rate in sorted(store._decay_by_tag.items())]
-    return {"fade_line": FADE_LINE, "soon_days": SOON_DAYS, "rates": rates}
+    """The store's fade rates for the page's chart: the default, then each tag's.
+
+    Each rate carries the age at which a row of :data:`CHART_IMPORTANCE` is
+    first under the line (``None`` for never), from :func:`days_to_line`, so the
+    page never works the crossing out itself.
+    """
+    start = round(episodic_search.recall_score(1.0, CHART_IMPORTANCE, 0.0, 0), 4)
+    pairs = [(None, store._decay_default), *sorted(store._decay_by_tag.items())]
+    return {
+        "fade_line": FADE_LINE,
+        "importance": CHART_IMPORTANCE,
+        "start": start,
+        "rates": [
+            {"tag": tag, "rate": rate, "days_to_line": days_to_line(start, rate, 0)}
+            for tag, rate in pairs
+        ],
+    }
