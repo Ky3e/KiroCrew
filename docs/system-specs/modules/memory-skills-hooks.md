@@ -3385,8 +3385,12 @@ path.
   `rate_tag`, `days_old`, `days_to_line`, `state`) to each V1 experience, after
   its revision hash, so the hash does not move with the day; a `strength` sort
   and facet; and, with `facets=1` on a V1 store, the store's
-  `decay` (`fade_line`, `soon_days`, `rates`). The summary cache keys on the UTC
-  day too. V2 stores send none of it: they do not decay.
+  `decay` (`fade_line`, `soon_days`, `rates`). A cached summary keeps the terms
+  its strength comes from (`memory_decay.summary_terms`), and every listing
+  recomputes strength and band from them (`memory_decay.refresh`), so a row
+  that ages past the line moves band with no write; the facet-count cache keys
+  on the bands' digest, and the summary cache on the fade rates, so a reloaded
+  `memory.decay_rates` is a miss. V2 stores send none of it: they do not decay.
 
 ### In-Process Embedder (`embeddings.py`)
 

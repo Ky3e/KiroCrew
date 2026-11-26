@@ -113,3 +113,43 @@ def test_a_row_under_the_line_is_faded_and_a_rate_of_zero_never_crosses():
     assert memory_decay.days_to_line(line - 0.01, 0.0, 0) == 0
     assert memory_decay.days_to_line(1.0, 0.0, 9) is None
     assert memory_decay.state(None) == memory_decay.STRONG
+
+
+def _later(monkeypatch, days: int) -> None:
+    """Move the record list's clock forward by *days*, with no write to the store."""
+    real = memory_edit.datetime
+
+    class Later(real):  # type: ignore[misc, valid-type]
+        @classmethod
+        def now(cls, tz=None):
+            return real.now(tz) + timedelta(days=days)
+
+    monkeypatch.setattr(memory_edit, "datetime", Later)
+
+
+def test_a_cached_listing_ages_its_rows_without_a_write(tmp_path, opened, monkeypatch):
+    store = _v1(tmp_path, opened)  # noqa: F811
+    query = {"kind": "episode", "filters": {"strength": ["faded"]}}
+    before = memory_edit.list_records(store, query, sort="strength", facets=True)
+    assert before["facets"]["strength"] == {"strong": 2, "fading": 1, "faded": 1}
+    # Four days on, the row three days from the line is under it, though the store is unchanged.
+    _later(monkeypatch, 4)
+    after = memory_edit.list_records(store, query, sort="strength", facets=True)
+    assert sorted(entry["text"] for entry in after["entries"]) == [
+        "almost faded note on the deploy",
+        "old note about the deploy",
+    ]
+    assert after["facets"]["strength"] == {"strong": 2, "faded": 2}
+    assert {entry["text"]: entry["decay"]["state"] for entry in after["entries"]} == {
+        "almost faded note on the deploy": memory_decay.FADED,
+        "old note about the deploy": memory_decay.FADED,
+    }
+
+
+def test_a_reloaded_rate_reaches_a_cached_listing(tmp_path, opened):
+    store = _v1(tmp_path, opened)  # noqa: F811
+    query = {"kind": "episode", "filters": {"strength": ["faded"]}}
+    assert len(memory_edit.list_records(store, query, sort="strength")["entries"]) == 1
+    # As VectorMemoryStore.reconfigure applies a hot-reloaded memory.decay_rates.
+    store._decay_default = 0.0
+    assert memory_edit.list_records(store, query, sort="strength")["entries"] == []

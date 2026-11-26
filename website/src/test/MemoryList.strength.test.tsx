@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { renderWithProviders } from './helpers'
 import { dayUnderLine, strengthAt } from '../pages/overview/memoryPage/MemoryStrength'
+import { memoryRecordParams } from '../api/client/memory'
 
 /**
  * A V1 store's experiences carry their strength in recall: a chip on the row, a
@@ -51,6 +52,13 @@ describe('the fade curve', () => {
   })
 })
 
+describe('the records request', () => {
+  it('sends a ticked strength band to the server', () => {
+    const params = memoryRecordParams('default', { q: '', kind: 'all', filters: { strength: ['faded', 'fading'] } }, 0, 50)
+    expect(params.getAll('strength')).toEqual(['faded', 'fading'])
+  })
+})
+
 describe('strength on the memory list', () => {
   it('shows each row’s strength, the rail’s bands and the store’s rates', async () => {
     renderWithProviders(<List />)
@@ -90,6 +98,17 @@ describe('strength on the memory list', () => {
     expect(within(detail).getByText('0.85')).toBeInTheDocument()
     expect(within(detail).getByText("Doesn't fade, set by #keep")).toBeInTheDocument()
     expect(within(detail).queryByRole('button', { name: 'Save as lesson' })).toBeNull()
+  })
+
+  it('opens a row whose crossing is past any date JavaScript holds', async () => {
+    const slow = { ...FADED, decay: { ...FADED.decay, strength: 0.85, rate: 1e-9, days_to_line: 791_993_016, state: 'strong' } }
+    api.memoryRecords.mockResolvedValue({ entries: [slow], total: 1, has_more: false, facets: FACETS, decay: { ...STORE_DECAY, rates: [{ tag: null, rate: 1e-9 }] } })
+    renderWithProviders(<List />)
+    const rows = await screen.findByRole('list', { name: 'Memories' })
+    fireEvent.click(within(rows).getByRole('button', { name: 'View details' }))
+    const detail = await screen.findByTestId('strength-detail')
+    expect(within(detail).queryByText(/new memories rank above it/)).toBeNull()
+    expect(within(screen.getByTestId('store-fade-chart')).getByText('Never')).toBeInTheDocument()
   })
 
   it('offers the Strength sort only on a store that fades', async () => {

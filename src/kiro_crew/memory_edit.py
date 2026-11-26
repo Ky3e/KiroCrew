@@ -345,14 +345,10 @@ def _summary(
 ) -> dict:
     """The light form of one row that the record list sorts, filters and counts.
 
-    With *now*, a V1 store's experience also carries its strength on that day.
+    With *now*, a V1 store's experience also carries its strength on that day, and
+    the terms ``memory_decay.refresh`` recomputes it from on a later day.
     """
     kind = row["kind"]
-    strength, band = (
-        memory_decay.summary_strength(store, row, now)
-        if now is not None and kind == "episode"
-        else (None, None)
-    )
     # The same source the assembled record reports: the item's on the crew lineage,
     # else the row's own, else the metadata's source reference.
     if "_source" in row.keys():
@@ -367,7 +363,7 @@ def _summary(
     ):
         updated = row["_m_updated"] or updated
     score = row["importance"]
-    return {
+    summary = {
         "kind": kind,
         "id": row["id"],
         "key": row["key"] or "",
@@ -375,7 +371,7 @@ def _summary(
         "updated_at": updated or "",
         "confidence": score if kind != "episode" and score is not None else None,
         "importance": score if kind == "episode" and score is not None else None,
-        "strength": strength,
+        "strength": None,
         "match": memory_record_facets.match_score(tokens, _normalized(row["key"] or ""), folded),
         "ref": memory_record_facets.record_ref(kind, row["id"]),
         "facets": memory_record_facets.summary_facets(
@@ -386,9 +382,12 @@ def _summary(
             # Where a row came from: stamped on the crew lineage only.
             surface=row["_surface"] if "_surface" in row.keys() else None,
             crew=row["_crew"] if "_crew" in row.keys() else None,
-            strength=band,
         ),
     }
+    if now is not None and kind == "episode":
+        summary[memory_decay.TERMS] = memory_decay.summary_terms(store, row)
+        memory_decay.refresh([summary], now)
+    return summary
 
 
 @contextlib.contextmanager
@@ -419,8 +418,10 @@ _FACET_CACHE: dict[tuple, tuple[list[dict], dict]] = {}
 _FACET_CACHE_SIZE = 32
 
 
-def _cached_facets(everything: list[dict], filters: dict, kind: str) -> dict:
-    key = (id(everything), kind, json.dumps(filters, sort_keys=True))
+def _cached_facets(everything: list[dict], filters: dict, kind: str, bands: int = 0) -> dict:
+    """Facet counts over *everything*, reused while the list and its strength
+    *bands* (``memory_decay.refresh``'s digest) are unchanged."""
+    key = (id(everything), kind, json.dumps(filters, sort_keys=True), bands)
     with _CACHE_LOCK:
         hit = _FACET_CACHE.get(key)
         if hit is not None and hit[0] is everything:
@@ -456,8 +457,10 @@ def _cached_summaries(store: Any, base: dict) -> list[dict]:
         except OSError:
             files.append(None)
     fingerprint = (
-        # Strength moves with the day, so a new day is a miss too.
-        datetime.now(timezone.utc).date(),
+        # The fade rates a summary's strength terms were read with: a rate
+        # reloaded from config is a miss. (Age is not: list_records refreshes it.)
+        getattr(store, "_decay_default", None),
+        tuple(sorted(getattr(store, "_decay_by_tag", {}).items())),
         store.db.total_changes,
         store.db.execute("PRAGMA data_version").fetchone()[0],
         *files,
@@ -540,6 +543,8 @@ def list_records(
         base = {"q": "" if meaning else query["q"], "kind": "all"}
         # Numbered before the meaning cut-off drops rows, so a position still names the row.
         everything = _cached_summaries(store, base)
+        # A cached row ages without a write: its strength and band are read for now.
+        bands = memory_decay.refresh(everything, datetime.now(timezone.utc))
         hidden = 0
         if vector is not None:
             # Copies: these match scores answer this question, not the cached pass.
@@ -601,7 +606,7 @@ def list_records(
     if facets:
         # A meaning search ranks a fresh copy each time: nothing to reuse.
         body["facets"] = (
-            _cached_facets(everything, filters, query["kind"])
+            _cached_facets(everything, filters, query["kind"], bands)
             if vector is None
             else memory_record_facets.count_facets(everything, filters, query["kind"])
         )

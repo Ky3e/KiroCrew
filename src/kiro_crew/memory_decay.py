@@ -20,7 +20,7 @@ they get no strength at all.
 from __future__ import annotations
 
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from kiro_crew.vector_memory_runtime import episodic_search
@@ -84,10 +84,53 @@ def record_decay(store: Any, row: Any, now: datetime) -> dict[str, Any]:
     }
 
 
-def summary_strength(store: Any, row: Any, now: datetime) -> tuple[float, str]:
-    """The strength and band a record list summary sorts and filters on."""
-    decay = record_decay(store, row, now)
-    return decay["strength"], decay["state"]
+#: Where a record list summary keeps what its strength is computed from.
+TERMS = "_decay"
+
+
+def summary_terms(store: Any, row: Any) -> tuple[float, float, float | None, int | None]:
+    """What a summary's strength is computed from, none of which moves with time:
+    the importance, the rate, the written time (epoch seconds, ``None`` when
+    unreadable, which counts as today) and the age at which it is under the line.
+
+    The record list caches summaries until the store changes, but a row's age,
+    and so its strength and band, moves on its own; :func:`refresh` recomputes
+    those two from these terms on every listing.
+    """
+    rate, _tag = episodic_search.decay_rule_for(store, row["tags"])
+    importance = episodic_search.row_importance(row)
+    start = episodic_search.recall_score(1.0, importance, rate, 0)
+    try:
+        written: datetime | None = datetime.fromisoformat(row["created_at"])
+    except (TypeError, ValueError):
+        written = None
+    if written is not None and written.tzinfo is None:
+        written = written.replace(tzinfo=timezone.utc)
+    return importance, rate, written.timestamp() if written else None, days_to_line(start, rate, 0)
+
+
+def refresh(summaries: list[dict[str, Any]], now: datetime) -> int:
+    """Set each summary's strength and band for *now*, from its :data:`TERMS`.
+
+    Returns a digest of every band, so a cache of counts over these summaries
+    can tell when a band moved although the store did not.
+    """
+    now_ts = now.timestamp()
+    bands = bytearray()
+    for summary in summaries:
+        terms = summary.get(TERMS)
+        if terms is None:
+            continue
+        importance, rate, written, crossing = terms
+        # Whole days, as timedelta.days counts them in row_age_days.
+        days_old = max(0, math.floor((now_ts - written) / 86400)) if written is not None else 0
+        band = state(None if crossing is None else max(0, crossing - days_old))
+        summary["strength"] = round(
+            episodic_search.recall_score(1.0, importance, rate, days_old), 4
+        )
+        summary["facets"]["strength"] = band
+        bands.append(STATES.index(band))
+    return hash(bytes(bands))
 
 
 def store_decay(store: Any) -> dict[str, Any]:

@@ -27,6 +27,11 @@ export function dayUnderLine(start: number, rate: number, line: number): number 
   if (rate <= 0) return null
   return Math.floor(Math.log(start / line) / rate) + 1
 }
+// A store accepts any rate from 0 up, so a tiny one puts the crossing past any
+// date JavaScript can hold. Past a century it reads as never.
+const FAR_DAYS = 36_500
+/** Days until the line, or null when it is never, or more than a century, away. */
+export const withinReach = (days: number | null) => days === null || days > FAR_DAYS ? null : days
 /** A per-day rate as a percent: 0.03 reads "3%". */
 const fmtRate = (rate: number) => fmtNumber(rate, { style: 'percent', maximumFractionDigits: 1 })
 
@@ -65,14 +70,15 @@ export function StrengthDetail({ decay, fadeLine, onSaveAsLesson }: { decay: Mem
   /** Copy the text into a new lesson, which never fades; only where lessons can be written. */
   onSaveAsLesson?: () => void }) {
   const { t } = useTranslation()
-  const crossing = decay.days_to_line === null ? null : decay.days_old + decay.days_to_line
+  const until = withinReach(decay.days_to_line)
+  const crossing = until === null ? null : decay.days_old + until
   // Enough days to show today and, when it comes, the day it crosses the line.
   const span = Math.max(decay.days_old + 7, crossing !== null ? Math.ceil(crossing * 1.2) : decay.days_old + 30, 14)
   const rate = decay.rate > 0
     ? t(decay.rate_tag ? 'memoryPage.strength_rate_tag' : 'memoryPage.strength_rate', { rate: fmtRate(decay.rate), tag: decay.rate_tag })
     : t(decay.rate_tag ? 'memoryPage.strength_never_tag' : 'memoryPage.strength_never', { tag: decay.rate_tag })
-  const below = decay.days_to_line === 0 ? t('memoryPage.strength_tip_faded')
-    : decay.days_to_line !== null ? t('memoryPage.strength_below_on', { date: fmtDate(new Date(Date.now() + decay.days_to_line * 86_400_000).toISOString()) }) : null
+  const below = until === 0 ? t('memoryPage.strength_tip_faded')
+    : until !== null ? t('memoryPage.strength_below_on', { date: fmtDate(new Date(Date.now() + until * 86_400_000).toISOString()) }) : null
   return <section aria-label={t('memoryPage.strength')} className="space-y-2" data-testid="strength-detail">
     <div className="flex items-baseline justify-between gap-2">
       <h4 className="m-0 text-[13px] font-medium text-muted">{t('memoryPage.strength')}</h4>
@@ -95,7 +101,7 @@ export function StrengthDetail({ decay, fadeLine, onSaveAsLesson }: { decay: Mem
  *  the line, and the day each crosses it. */
 export function StoreFadeChart({ decay }: { decay: MemoryStoreDecay }) {
   const { t } = useTranslation()
-  const days = decay.rates.map(rate => dayUnderLine(TYPICAL_START, rate.rate, decay.fade_line))
+  const days = decay.rates.map(rate => withinReach(dayUnderLine(TYPICAL_START, rate.rate, decay.fade_line)))
   const span = Math.max(30, ...days.map(day => (day ?? 0) * 1.2))
   const caption = t('memoryPage.strength_chart_caption', { importance: fmtNumber(0.5) })
   return <div className="space-y-1.5 pb-1" data-testid="store-fade-chart">
