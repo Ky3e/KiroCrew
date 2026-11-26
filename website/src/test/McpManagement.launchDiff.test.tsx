@@ -469,6 +469,25 @@ describe('a launch that changed its command and gained a key', () => {
     expect(columnLaunches(container, M('details_new'))).toEqual([['/opt/search --v2', 'LD_PRELOAD']])
   })
 
+  it('names a key the gateway found changed when both sides display the same redacted value', () => {
+    const shown = 'NODE_OPTIONS=--token=[REDACTED: credential]'
+    const line = M('diff_env_value_changed', { name: 'NODE_OPTIONS' })
+    const same = { ...pathOnly, approved_commands: [CMD], approved_envs: [[shown]], commands: [CMD], envs: [[shown]] }
+    // Equal displays alone name nothing; the gateway's flag names the key.
+    expect(render(<RefusalLaunch refusal={same} />).container.textContent).not.toContain(line)
+    cleanup()
+    const flagged = render(<RefusalLaunch refusal={{ ...same, changed_env_keys: ['NODE_OPTIONS'] }} />)
+    expect(flagged.container.textContent).toContain(line)
+    cleanup()
+    // Beside a visible PATH change too, where each launch gets its own summary.
+    const beside = render(
+      <RefusalLaunch
+        refusal={{ ...same, approved_envs: [[OLD_PATH, shown]], envs: [[NEW_PATH, shown]], changed_env_keys: ['NODE_OPTIONS'] }}
+      />,
+    )
+    expect(beside.container.textContent?.split(line).length).toBe(2)
+  })
+
   it('lists no key for a plain version bump that kept every value', () => {
     const v1 = ['/opt/search', '--v1']
     const v2 = ['/opt/search', '--v2']

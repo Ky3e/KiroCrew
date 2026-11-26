@@ -1470,6 +1470,40 @@ async def test_the_stored_approved_display_is_redacted(tmp_path, toggle_home):
     assert any("<hidden sha256:" in line for line in refusal["approved_envs"][0])
 
 
+@pytest.mark.asyncio
+async def test_a_changed_launch_refusal_names_a_key_whose_redacted_value_changed(
+    tmp_path, toggle_home, monkeypatch
+):
+    from kiro_crew.dashboard import token_secret
+
+    mod = _approval_module()
+    assert mod is not None
+    monkeypatch.setattr(token_secret, "get_persisted_secret", lambda: b"k" * 32)
+    old = "--token=sk-proj-" + "a" * 44
+    new = "--token=sk-proj-" + "b" * 44
+
+    def declare(node_options: str) -> None:
+        env = {"NODE_OPTIONS": node_options, "MODE": "fast"}
+        server = {"command": _APPROVED_CMD, "args": [], "env": env}
+        spec = {"name": "a", "tools": ["*"], "mcpServers": {"srv": server}}
+        (toggle_home / "a.json").write_text(json.dumps(spec))
+
+    declare(old)
+    assert (await _toggle_on())[0] == 200
+    declare(new)
+    _target_env, refused = _next_boot_rewrite(tmp_path, toggle_home)
+    assert refused.refused == {"SRV": mod.REFUSED_CHANGED}
+    assert mod.save_pass(refused)
+    refusal = mod.refused_servers()["srv"]
+
+    # Both sides display the same redacted token, so only the gateway can tell.
+    assert refusal["envs"] == refusal["approved_envs"]
+    assert any("[REDACTED" in line for line in refusal["envs"][0])
+    assert refusal.get("changed_env_keys") == ["NODE_OPTIONS"]
+    stored = mod.approvals_path().read_text(encoding="utf-8")
+    assert old not in stored and new not in stored
+
+
 def test_opaque_env_values_are_hidden_in_live_and_persisted_displays(tmp_path):
     mod = _approval_module()
     assert mod is not None

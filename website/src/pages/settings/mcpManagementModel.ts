@@ -47,6 +47,9 @@ export type LaunchRefusal = {
   envs?: string[][]
   approved_commands?: string[][]
   approved_envs?: string[][]
+  // Env keys set on both sides whose value changed, which the gateway reads
+  // from keyed digests of the real values: names only, never a value.
+  changed_env_keys?: string[]
   // False when the launch could not be read in full, which is also when
   // `expected_launch` is absent: a partial launch cannot be approved.
   complete?: boolean
