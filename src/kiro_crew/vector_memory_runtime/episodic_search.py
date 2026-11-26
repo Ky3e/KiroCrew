@@ -921,8 +921,8 @@ def row_importance(row) -> float:
 
 def recall_weight(store: VectorMemoryStore, row, now: datetime) -> float:
     """What recall would score the experience *row* at a perfect match: the
-    part of its score the query does not decide. The memory graph fades a node
-    by it, and the memory page shows it as the row's strength.
+    part of its score the query does not decide. The memory page shows it as
+    the row's strength.
     """
     return recall_score(
         1.0, row_importance(row), store._decay_rate_for(row["tags"]), row_age_days(row, now)

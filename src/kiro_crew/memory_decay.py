@@ -3,8 +3,8 @@
 V1 recall scores an experience as ``cosine * (0.7 + 0.3 * importance) *
 exp(-rate * days_old)`` (:func:`episodic_search.recall_score`). Its *strength* is
 that score at a perfect match (:func:`episodic_search.recall_weight`): the part
-the query does not decide. The memory page and the memory graph both read it from
-there, so the two views and recall agree.
+the query does not decide. The memory page reads it from there, so the page and
+recall agree.
 
 The *fade line* is the score of a memory written today, at the lowest importance,
 that just clears the relevance gate: ``_EPISODIC_RELEVANCE_THRESHOLD * 0.7``.
@@ -53,7 +53,11 @@ def days_to_line(start: float, rate: float, days_old: int) -> int | None:
         return 0
     if rate <= 0:
         return None
-    crossing = math.floor(math.log(start / FADE_LINE) / rate) + 1
+    reach = math.log(start / FADE_LINE) / rate
+    # A subnormal rate passes the config clamp and overflows the division.
+    if not math.isfinite(reach):
+        return None
+    crossing = math.floor(reach) + 1
     return max(0, crossing - days_old)
 
 

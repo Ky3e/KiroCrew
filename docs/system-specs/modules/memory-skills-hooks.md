@@ -3363,8 +3363,7 @@ The memory page shows mechanism 2 per experience. A V1 experience's
 **strength** is `episodic_search.recall_weight`: `recall_score` at a cosine of
 1, so `(0.7 + 0.3 × importance) × exp(-rate × days_old)`. `recall_score` is the
 one place the formula lives; the FAISS rung, the vectorised scoring set and
-`episodic_candidate` all call it, and the memory graph fades nodes by the same
-`recall_weight`. `test_memory_decay.py` pins the shown strength equal to the
+`episodic_candidate` all call it. `test_memory_decay.py` pins the shown strength equal to the
 score recall returns for an exact match, on both the vectorised and the stdlib
 path.
 

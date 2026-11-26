@@ -213,8 +213,12 @@ def _rows(
     *,
     page: range | set[int] | None = None,
     summaries: bool = False,
+    now: datetime | None = None,
 ):
     """Yield every record *query* matches, in ``kind, id`` order.
+
+    *now* is the clock strength is read on; a caller that also refreshes cached
+    summaries passes its own, so the list and its rows agree.
 
     With *summaries*, each match is yielded as a light summary instead (kind, id,
     facets, dates, confidence, importance and the search match score) and no
@@ -241,7 +245,7 @@ def _rows(
 
     tokens = _normalized(query["q"]).split()
     # One clock for the pass, so every row's strength is read on the same day.
-    now = datetime.now(timezone.utc)
+    now = now or datetime.now(timezone.utc)
     decays = memory_decay.applies(store)
     sql = (
         "SELECT CASE WHEN key LIKE 'lesson.%' THEN 'directive' ELSE 'fact' END AS kind, "
@@ -544,7 +548,8 @@ def list_records(
         # Numbered before the meaning cut-off drops rows, so a position still names the row.
         everything = _cached_summaries(store, base)
         # A cached row ages without a write: its strength and band are read for now.
-        bands = memory_decay.refresh(everything, datetime.now(timezone.utc))
+        now = datetime.now(timezone.utc)
+        bands = memory_decay.refresh(everything, now)
         hidden = 0
         if vector is not None:
             # Copies: these match scores answer this question, not the cached pass.
@@ -578,11 +583,11 @@ def list_records(
         if window and all(isinstance(s["id"], str) and s["id"] for s in window):
             # Every row has an id, so the page is read by id, not by a pass over the store.
             at = {(s["kind"], s["id"]): s["position"] for s in window}
-            for row in _rows(store, base, list(at)):
+            for row in _rows(store, base, list(at), now=now):
                 _conflict_count(store, row)
                 assembled[at[(row["kind"], row["id"])]] = row
         elif positions:
-            rows = _rows(store, base, page=positions)
+            rows = _rows(store, base, page=positions, now=now)
             for position, row in enumerate(rows):
                 if row is not None:
                     _conflict_count(store, row)

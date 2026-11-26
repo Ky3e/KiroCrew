@@ -112,6 +112,8 @@ def test_a_row_under_the_line_is_faded_and_a_rate_of_zero_never_crosses():
     line = memory_decay.FADE_LINE
     assert memory_decay.days_to_line(line - 0.01, 0.0, 0) == 0
     assert memory_decay.days_to_line(1.0, 0.0, 9) is None
+    # A subnormal rate passes the config clamp; its crossing is never, not an overflow.
+    assert memory_decay.days_to_line(0.85, 1e-310, 0) is None
     assert memory_decay.state(None) == memory_decay.STRONG
 
 
