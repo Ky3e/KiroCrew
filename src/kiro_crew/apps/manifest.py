@@ -708,6 +708,7 @@ class AppManifest:
                 errors.append("ui page missing required field: route")
             if not page.label:
                 errors.append("ui page missing required field: label")
+            errors.extend(page.search_words_errors())
             refusal = path_refusal(page.entryPoint)
             if refusal:
                 report_path(refusal, f"ui page entryPoint {refusal}: {page.entryPoint!r}")

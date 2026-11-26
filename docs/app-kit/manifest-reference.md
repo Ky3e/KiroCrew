@@ -428,6 +428,7 @@ each replaced field with its old and new value (a WARNING line ending in
 | `ui.pages[].iconInactiveUrl` | string | | Optional sidebar icon for when the app is not selected (relative to ui/). Read from the first page. The sidebar row shows this file while another page is open, and the app's normal icon when its own page is open or the row is hovered. Use it for a greyed-out variant, the way built-in icons go grey. If the file fails to load, the row keeps the normal icon |
 | `ui.pages[].entryPoint` | string | | Per-page ESM bundle path, relative to ui/ (overrides `ui.entry`) |
 | `ui.pages[].mountFunction` | string | `"mount"` | Exported function name in the ESM bundle |
+| `ui.pages[].searchWords` | string[] | `[]` | English phrases a newcomer might use for this page, such as `"cloud accounts"`. The agent's `find_ui` tool searches them beside the page's label and the app's `displayName`. At most 16, each at most 60 characters and not blank; install refuses anything else. Only apps that ship with Kiro Crew are indexed for now: an app installed later is not searchable by `find_ui` |
 | `ui.sidebar.section` | string | `"Apps"` | Sidebar section name |
 | `ui.sidebar.order` | number | `10` | Sort order within section |
 | `ui.overlays[].id` | string | | Overlay id; must match a bundled overlay component (see below) |

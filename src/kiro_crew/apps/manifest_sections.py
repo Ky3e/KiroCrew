@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from kiro_crew.apps.app_hosts import frame_origin_refusal
 from kiro_crew.apps.desktop_capabilities import declared_capabilities
 from kiro_crew.apps.manifest_names import KEBAB_RE
+from kiro_crew.apps.manifest_search_words import search_words_errors
 from kiro_crew.apps.user_session_reach import declared_verbs
 
 if TYPE_CHECKING:
@@ -260,12 +261,23 @@ class UIPage:
     # ``UIConfig.entry`` below, because one static route serves both.
     entryPoint: str = ""  # noqa: N815
     mountFunction: str = "mount"  # exported function name  # noqa: N815
+    # English phrases a newcomer might use for this page, searched by find_ui.
+    # Read at index build time for the apps that ship in the package.
+    search_words: list[str] = field(default_factory=list)
+    # Set when ``search_words`` was not a list of strings, so validation can refuse it.
+    search_words_type_invalid: bool = False
+
+    def search_words_errors(self) -> list[str]:
+        """Why ``searchWords`` would be refused (``manifest_search_words``)."""
+        return search_words_errors(self.route, self.search_words, self.search_words_type_invalid)
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
             "route": self.route,
             "label": self.label,
         }
+        if self.search_words:
+            d["searchWords"] = list(self.search_words)
         if self.icon:
             d["icon"] = self.icon
         if self.iconUrl:
@@ -280,7 +292,11 @@ class UIPage:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> UIPage:
+        raw_words = data.get("searchWords", [])
+        words_ok = isinstance(raw_words, list) and all(isinstance(w, str) for w in raw_words)
         return cls(
+            search_words=list(raw_words) if words_ok else [],
+            search_words_type_invalid=not words_ok,
             route=str(data.get("route", "")),
             label=str(data.get("label", "")),
             icon=str(data.get("icon", "")),
