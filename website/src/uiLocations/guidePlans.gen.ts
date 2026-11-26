@@ -3,7 +3,7 @@
 import type { UiGuidePlan } from './types'
 
 /** The `build_digest` of the packaged index this bundle was built with (see `guideBuildDigest`). */
-export const GUIDE_BUILD_DIGEST = "sha256:eec5f91025114e069e0c65f44ae6a99a2a57a81fabc8796b4fb03743c3ddad1d"
+export const GUIDE_BUILD_DIGEST = "sha256:710390c825d873fc179ae8547d1cf71559a3ff582973357b080c60a647dcd573"
 
 /** Curated location ids: the only ids a live observation may name. */
 export const GUIDE_OBSERVABLE_IDS: readonly string[] = [
@@ -102,13 +102,13 @@ export const GUIDE_OBSERVABLE_IDS: readonly string[] = [
   "members.switcher.show-roster",
   "members.switcher.unread",
   "members.switcher.unread-more",
+  "memory.test-recall",
   "notifications.clear-all",
   "notifications.detail.mark-unread",
   "notifications.mark-all-read",
   "notifications.mute-channel",
   "notifications.page-clear-all",
   "notifications.page-mark-all-read",
-  "overview.memory-details",
   "schedule.add-job",
   "schedule.batch-actions",
   "schedule.cancel-run",
@@ -2519,18 +2519,19 @@ export const GUIDE_PLANS: Readonly<Record<string, UiGuidePlan>> = {
       }
     ]
   },
-  "overview.memory-details": {
+  "memory.test-recall": {
     "version": 2,
-    "label_key": "pages.overviewPage.view_details",
+    "label_key": "memoryPage.test_recall",
     "placements": [
       {
-        "id": "any",
-        "route": "/settings/overview",
+        "id": "desktop",
+        "route": "/settings/memory",
+        "viewport": "desktop",
         "steps": [
           {
-            "id": "any:overview.memory-details",
-            "location": "overview.memory-details",
-            "label_key": "pages.overviewPage.view_details"
+            "id": "desktop:memory.test-recall",
+            "location": "memory.test-recall",
+            "label_key": "memoryPage.test_recall"
           }
         ]
       }
